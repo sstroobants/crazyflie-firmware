@@ -26,6 +26,8 @@
 #include "sleepus.h"
 #include "usec_time.h"
 
+static bool isInit = false;
+
 void sleepus(uint32_t us)
 {
   uint64_t start = usecTimestamp();
