@@ -27,3 +27,8 @@
 #include <stdint.h>
 
 void sleepus(uint32_t us);
+<<<<<<< HEAD
+=======
+
+#endif // __SLEEPNS_H__
+>>>>>>> nau7802: minor tweaks
