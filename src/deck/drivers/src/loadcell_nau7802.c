@@ -415,6 +415,7 @@ static void loadcellInit(DeckInfo *info)
     // return;
   // }
 
+  isInit = true;
 
   // sleepus(1000 * 1000);
   // isInit &= nau7802_reset();
