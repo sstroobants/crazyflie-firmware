@@ -543,16 +543,6 @@ static void dwm1000Init(DeckInfo *info)
 
   memoryRegisterHandler(&memDef);
 
-<<<<<<< HEAD
-=======
-  // // Enable interrupt
-  // NVIC_InitStructure.NVIC_IRQChannel = EXTI_IRQChannel;
-  // NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = NVIC_VERY_HIGH_PRI;
-  // NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
-  // NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
-  // NVIC_Init(&NVIC_InitStructure);
-
->>>>>>> exti cleanup
   algoSemaphore= xSemaphoreCreateMutex();
 
   xTaskCreate(uwbTask, LPS_DECK_TASK_NAME, LPS_DECK_STACKSIZE, NULL,
