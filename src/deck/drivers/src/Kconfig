@@ -436,3 +436,26 @@ config DECK_CPX_HOST_ON_UART2
       forced, since this is intended to be used without actually having a proper
       deck attached (i.e there will be no 1-wire memory to automatically detect
       and start the driver).
+
+config DECK_SYSTEM_ID
+    bool "Support the System-ID development deck (prototype)"
+    default n
+    help
+        The System-ID deck is a develoment deck to help with system identificaiton.
+        It measures voltage, current and force. Only prototypes of this deck 
+        exist so far.
+
+config DECK_LOADCELL_NAU
+    bool "Enable nau7802 loadcell capabilities"
+    depends on DECK_SYSTEM_ID
+    default y
+
+config DECK_ACS37800
+    bool "Enable ACS37800 voltage, current and power measurement"
+    depends on DECK_SYSTEM_ID
+    default y
+
+config DECK_RPM
+    bool "Enable propeller RPM measurement using QRD1114 IR reflector-sensor"
+    depends on DECK_SYSTEM_ID
+    default y
