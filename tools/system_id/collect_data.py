@@ -45,43 +45,6 @@ class CollectData:
         has been connected and the TOCs have been downloaded."""
         print('Connected to %s' % link_uri)
 
-        print(self.calib_a, self.calib_b)
-        self._cf.param.set_value('loadcell.a', str(self.calib_a))
-        self._cf.param.set_value('loadcell.b', str(self.calib_b))
-
-        self._file = open("data.csv", "w+")
-        self._file.write("weight[g],pwm,vbat[V],rpm1,rpm2,rpm3,rpm4,v[V],i[A],p[W]\n");
-
-        # The definition of the logconfig can be made before connecting
-        self._lg_stab = LogConfig(name='data', period_in_ms=10)
-        self._lg_stab.add_variable('loadcell.weight', 'float')
-        self._lg_stab.add_variable('pwm.m1_pwm', 'uint16_t')
-        self._lg_stab.add_variable('pm.vbatMV', 'uint16_t')
-        self._lg_stab.add_variable('rpm.m1', 'uint16_t')
-        self._lg_stab.add_variable('rpm.m2', 'uint16_t')
-        self._lg_stab.add_variable('rpm.m3', 'uint16_t')
-        self._lg_stab.add_variable('rpm.m4', 'uint16_t')
-        self._lg_stab.add_variable('asc37800.v_mV', 'int16_t')
-        self._lg_stab.add_variable('asc37800.i_mA', 'int16_t')
-        self._lg_stab.add_variable('asc37800.p_mW', 'int16_t')
-
-        # Adding the configuration cannot be done until a Crazyflie is
-        # connected, since we need to check that the variables we
-        # would like to log are in the TOC.
-        try:
-            self._cf.log.add_config(self._lg_stab)
-            # This callback will receive the data
-            self._lg_stab.data_received_cb.add_callback(self._stab_log_data)
-            # This callback will be called on errors
-            self._lg_stab.error_cb.add_callback(self._stab_log_error)
-            # Start the logging
-            self._lg_stab.start()
-        except KeyError as e:
-            print('Could not start log configuration,'
-                  '{} not found in TOC'.format(str(e)))
-        except AttributeError:
-            print('Could not add Stabilizer log config, bad configuration.')
-
         # Start a separate thread to do the motor test.
         # Do not hijack the calling thread!
         Thread(target=self._ramp_motors).start()
@@ -129,6 +92,43 @@ class CollectData:
         pitch = 0
         roll = 0
         yawrate = 0
+
+        print(self.calib_a, self.calib_b)
+        self._cf.param.set_value('loadcell.a', str(self.calib_a))
+        self._cf.param.set_value('loadcell.b', str(self.calib_b))
+
+        self._file = open("data.csv", "w+")
+        self._file.write("weight[g],pwm,vbat[V],rpm1,rpm2,rpm3,rpm4,v[V],i[A],p[W]\n");
+
+        # The definition of the logconfig can be made before connecting
+        self._lg_stab = LogConfig(name='data', period_in_ms=10)
+        self._lg_stab.add_variable('loadcell.weight', 'float')
+        self._lg_stab.add_variable('pwm.m1_pwm', 'uint16_t')
+        self._lg_stab.add_variable('pm.vbatMV', 'uint16_t')
+        self._lg_stab.add_variable('rpm.m1', 'uint16_t')
+        self._lg_stab.add_variable('rpm.m2', 'uint16_t')
+        self._lg_stab.add_variable('rpm.m3', 'uint16_t')
+        self._lg_stab.add_variable('rpm.m4', 'uint16_t')
+        self._lg_stab.add_variable('asc37800.v_mV', 'int16_t')
+        self._lg_stab.add_variable('asc37800.i_mA', 'int16_t')
+        self._lg_stab.add_variable('asc37800.p_mW', 'int16_t')
+
+        # Adding the configuration cannot be done until a Crazyflie is
+        # connected, since we need to check that the variables we
+        # would like to log are in the TOC.
+        try:
+            self._cf.log.add_config(self._lg_stab)
+            # This callback will receive the data
+            self._lg_stab.data_received_cb.add_callback(self._stab_log_data)
+            # This callback will be called on errors
+            self._lg_stab.error_cb.add_callback(self._stab_log_error)
+            # Start the logging
+            self._lg_stab.start()
+        except KeyError as e:
+            print('Could not start log configuration,'
+                  '{} not found in TOC'.format(str(e)))
+        except AttributeError:
+            print('Could not add Stabilizer log config, bad configuration.')
 
         # # Unlock startup thrust protection
         # for i in range(0, 100):
