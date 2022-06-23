@@ -97,7 +97,7 @@ const MotorHealthTestDef unknownMotorHealthTestSettings = {
 
 static bool isInit = false;
 static uint64_t lastCycleTime;
-static uint32_t cycleTime;
+static uint16_t cycleTime;
 
 /* Private functions */
 
@@ -492,7 +492,7 @@ void motorsSetRatio(uint32_t id, uint16_t ithrust)
     if (id == MOTOR_M1)
     {
       uint64_t currTime = usecTimestamp();
-      cycleTime = currTime - lastCycleTime;
+      cycleTime = (uint16_t)(currTime - lastCycleTime);
       lastCycleTime = currTime;
     }
   }
