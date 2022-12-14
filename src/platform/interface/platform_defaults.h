@@ -109,9 +109,9 @@
     #define PID_VEL_Z_FILT_CUTOFF_BARO_Z_HOLD 0.7 f
 #endif
 
-// Tumble detection enabled by default
+// FIXME: Tumble detection enabled by default, changed to false for system-id
 #ifndef SUPERVISOR_TUMBLE_CHECK_ENABLE
-    #define SUPERVISOR_TUMBLE_CHECK_ENABLE true
+    #define SUPERVISOR_TUMBLE_CHECK_ENABLE false
 #endif
 
 
@@ -141,5 +141,3 @@
 #ifndef HEALTH_BRUSHLESS_VARIANCE_START_MSEC
     #define HEALTH_BRUSHLESS_VARIANCE_START_MSEC 1000
 #endif
-
-
