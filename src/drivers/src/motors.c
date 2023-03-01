@@ -99,11 +99,6 @@ static bool isInit = false;
 static uint64_t lastCycleTime;
 static uint16_t cycleTime;
 
-// Compensate thrust depending on battery voltage so it will produce about the same
-// amount of thrust independent of the battery voltage. Based on thrust measurement.
-// Not applied for brushless motor setup.
-static uint8_t batCompensation = true;
-
 /* Private functions */
 
 #ifndef CONFIG_MOTORS_ESC_PROTOCOL_DSHOT
