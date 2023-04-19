@@ -24,7 +24,7 @@ Mount CF upside down (to avoid downwash)
 
 1. Mount CF
 2. Switch to crazyflie-lib-python with branch `feature-emergency-stop` in order to be able to CTRL+C a script safely.
-3. Flash firmware from dev-systemId branch
+3. Flash firmware from dev-systemId branch which is built with "make sysid_defconfig" first.
 4. Run `python3 calibscale.py --uri <URI>` and follow the prompts to calibrate the load cell. This will create an output file `calibration.yaml` with the calibration data. The other scripts will read this file (other name can be specified as command line argument).
 
 ### Ramping Motors
