@@ -75,6 +75,7 @@
 #define ACSREG_P_INSTANT    0x2C
 #define ACSREG_DSP_STATUS   0x2D
 #define ACSREG_ACCESS_CODE  0x2F
+#define ACSREG_ACCESS_STATE 0x30
 
 #define ACS_I2C_ADDR        0x7F
 #define ACS_ACCESS_CODE     0x4F70656E
@@ -190,15 +191,25 @@ static void ascFindAndSetAddress(void)
       // Unlock EEPROM
       dummy = ACS_ACCESS_CODE;
       i2cdevWriteReg8(I2C1_DEV, startAddr, ACSREG_ACCESS_CODE, 4, (uint8_t *)&dummy);
+      // Check access
+      i2cdevReadReg8(I2C1_DEV, startAddr, ACSREG_ACCESS_STATE, 4, (uint8_t *)&dummy);
+      dummy == 0 ? DEBUG_PRINT("Access denied:%X\n", (unsigned int)dummy) : DEBUG_PRINT("Access granted\n");
       // EEPROM: write and lock i2c address to 0x7F;
       i2cdevReadReg8(I2C1_DEV, startAddr, ACSREG_E_IO_SEL, 4, (uint8_t *)&dummy);
       DEBUG_PRINT("ACS37800 A:0x%.2X R:0x%.2X:%X\n", (unsigned int)startAddr, (unsigned int)ACSREG_E_IO_SEL, (unsigned int)dummy);
 
       dummy = (0x7F << 2) | (0x01 << 9);
-      i2cdevWriteReg8(I2C1_DEV, startAddr, ACSREG_E_IO_SEL, 4, (uint8_t *)&dummy);
+      isReplying = i2cdevWriteReg8(I2C1_DEV, startAddr, ACSREG_E_IO_SEL, 4, (uint8_t *)&dummy);
       vTaskDelay(M2T(10));
+      if (isReplying)
+      {
+        DEBUG_PRINT("ACS37800 found on: %d. Setting address to 0x7F. Power cycle needed!\n", startAddr);
+      }
+      else
+      {
+        DEBUG_PRINT("ACS37800 writing new address failed!\n");
+      }
 
-      DEBUG_PRINT("ACS37800 found on: %d. Setting address to 0x7E. Power cycle needed!\n", startAddr);
     }
   }
 }
@@ -215,8 +226,13 @@ static void asc37800Init(DeckInfo *info)
 
   if (i2cdevWrite(I2C1_DEV, ACS_I2C_ADDR, 1, (uint8_t *)&dummy))
   {
-    asc37800Write32(ACSREG_ACCESS_CODE, ACS_ACCESS_CODE);
     DEBUG_PRINT("ACS37800 I2C [OK]\n");
+    asc37800Write32(ACSREG_ACCESS_CODE, ACS_ACCESS_CODE);
+    // Check access
+    asc37800Read32(ACSREG_ACCESS_STATE, &val);
+    DEBUG_PRINT("ACS37800 Access ");
+    val == 0 ? DEBUG_PRINT("[FAIL]\n") : DEBUG_PRINT("[OK]\n");
+
   }
   else
   {
@@ -224,7 +240,7 @@ static void asc37800Init(DeckInfo *info)
   }
 
   // Enable bypass in shadow reg and set N to 32.
-  asc37800Write32(ACSREG_S_IO_SEL, (1 << 24) | (32 << 14) | (0x01 << 9) |  (0x7F << 2));
+  asc37800Write32(ACSREG_S_IO_SEL, (1 << 24) | (320 << 14) | (0x01 << 9) |  (0x7F << 2));
   // Set current and power for averaging and keep device specific (trim) settings.
   asc37800Read32(ACSREG_S_TRIM, &val);
   currZtrim = currZtrimOld = val & 0xFF;
