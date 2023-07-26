@@ -33,7 +33,7 @@
 #include "log.h"
 #include "commander.h"
 #include "platform_defaults.h"
-
+#include "teensydeck.h"
 
 static bool attFiltEnable = ATTITUDE_LPF_ENABLE;
 static bool rateFiltEnable = ATTITUDE_RATE_LPF_ENABLE;
@@ -97,7 +97,9 @@ PidObject pidYaw = {
 };
 
 static int16_t rollOutput;
+static int16_t rollOutputFake;
 static int16_t pitchOutput;
+static int16_t pitchOutputFake;
 static int16_t yawOutput;
 
 static bool isInit;
@@ -143,10 +145,28 @@ void attitudeControllerCorrectRatePID(
        float rollRateDesired, float pitchRateDesired, float yawRateDesired)
 {
   pidSetDesired(&pidRollRate, rollRateDesired);
-  rollOutput = saturateSignedInt16(pidUpdate(&pidRollRate, rollRateActual, true));
+  rollOutputFake = saturateSignedInt16(pidUpdate(&pidRollRate, rollRateActual, true));
 
   pidSetDesired(&pidPitchRate, pitchRateDesired);
-  pitchOutput = saturateSignedInt16(pidUpdate(&pidPitchRate, pitchRateActual, true));
+  pitchOutputFake = saturateSignedInt16(pidUpdate(&pidPitchRate, pitchRateActual, true));
+
+  // Get SNN PID values. If these are incorrect, fallback on real pid
+  if (teensyGetStatus()) {
+//   if (false) {
+    float snnRollPidOutput = 0.0f;
+    snnRollPidOutput += teensyGetRollRateP();
+    snnRollPidOutput += teensyGetRollRateI();
+    snnRollPidOutput += teensyGetRollRateD();
+    rollOutput = saturateSignedInt16(snnRollPidOutput);
+    float snnPitchPidOutput = 0.0f;
+    snnPitchPidOutput += teensyGetPitchRateP();
+    snnPitchPidOutput += teensyGetPitchRateI();
+    snnPitchPidOutput += teensyGetPitchRateD();
+    pitchOutput = saturateSignedInt16(snnPitchPidOutput);
+  } else {
+    rollOutput = rollOutputFake;
+    pitchOutput = pitchOutputFake;
+  }
 
   pidSetDesired(&pidYawRate, yawRateDesired);
 
@@ -314,6 +334,22 @@ LOG_ADD(LOG_FLOAT, yaw_outD, &pidYawRate.outD)
  * @brief Feedforward output yaw rate
  */
 LOG_ADD(LOG_FLOAT, yaw_outFF, &pidYawRate.outFF)
+/**
+ * @brief total output of conv. pid roll
+ */
+LOG_ADD(LOG_INT16, roll_output, &rollOutputFake)
+/**
+ * @brief total output of snn pid roll
+ */
+LOG_ADD(LOG_INT16, roll_output_snn, &rollOutput)
+/**
+ * @brief total output of conv. pid pitch
+ */
+LOG_ADD(LOG_INT16, pitch_output, &pitchOutputFake)
+/**
+ * @brief total output of snn pid pitch
+ */
+LOG_ADD(LOG_INT16, pitch_output_snn, &pitchOutput)
 LOG_GROUP_STOP(pid_rate)
 
 /**

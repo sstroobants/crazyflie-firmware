@@ -6,5 +6,6 @@
     },
     "files.associations": {
         "bootloader.h": "c"
-    }
+    },
+    "cmake.sourceDirectory": "${workspaceFolder}/vendor/CMSIS/CMSIS/DSP/Source/CommonTables"
 }

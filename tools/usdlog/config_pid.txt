@@ -1,0 +1,25 @@
+1     # version
+1024   # buffer size in bytes
+log   # file name
+1     # enable on startup (0/1)
+on:fixedFrequency
+500     # frequency
+1     # mode (0: disabled, 1: synchronous stabilizer, 2: asynchronous)
+stateEstimateZ.rateRoll
+stateEstimateZ.ratePitch
+stateEstimateZ.rateYaw
+gyro.x
+gyro.y
+gyro.z
+controller.rollRate
+controller.pitchRate
+controller.yawRate
+pid_rate.pitch_outP
+pid_rate.pitch_outI
+pid_rate.pitch_outD
+pid_rate.roll_outP
+pid_rate.roll_outI
+pid_rate.roll_outD
+pid_rate.yaw_outP
+pid_rate.yaw_outI
+pid_rate.yaw_outD

@@ -66,6 +66,27 @@ if re.search('stabilizer', keys):
         plotStab = 1
         plotRows += 1
     
+plotPitchRate = 0
+if re.search('stateEstimateZ', keys):
+    inStr = input("plot pitch rate data? ([Y]es / [n]o): ")
+    if ((re.search('^[Yy]', inStr)) or (inStr == '')):
+        plotPitchRate = 1
+        plotRows += 1
+
+plotRatePID = 0
+if re.search('pid_rate', keys):
+    inStr = input("plot rate pid data? ([Y]es / [n]o): ")
+    if ((re.search('^[Yy]', inStr)) or (inStr == '')):
+        plotRatePID = 1
+        plotRows += 1
+
+plotDesired = 0
+if re.search('controller', keys):
+    inStr = input("plot target rate data? ([Y]es / [n]o): ")
+    if ((re.search('^[Yy]', inStr)) or (inStr == '')):
+        plotDesired = 1
+        plotRows += 1
+
 # current plot for simple subplot usage
 plotCurrent = 0
 
@@ -126,4 +147,31 @@ if plotStab:
     plt.ylabel('Stabilizer')
     plt.legend(loc=9, ncol=4, borderaxespad=0.)
 
+if plotPitchRate:
+    plotCurrent += 1
+    plt.subplot(plotRows, plotCols, plotCurrent)
+    plt.plot(logData['timestamp'], logData['stateEstimateZ.ratePitch'], '-', label='pitch rate')
+    plt.xlabel('timestamp [ms]')
+    plt.ylabel('stateEstimateZ')
+    plt.legend(loc=9, ncol=4, borderaxespad=0.)
+
+if plotRatePID:
+    plotCurrent += 1
+    plt.subplot(plotRows, plotCols, plotCurrent)
+    plt.plot(logData['timestamp'], logData['pid_rate.pitch_outP'], '-', label='p')
+    plt.plot(logData['timestamp'], logData['pid_rate.pitch_outI'], '-', label='i')
+    plt.plot(logData['timestamp'], logData['pid_rate.pitch_outD'], '-', label='d')
+    plt.xlabel('timestamp [ms]')
+    plt.ylabel('rate pid')
+    plt.legend(loc=9, ncol=4, borderaxespad=0.)
+
+if plotDesired:
+    plotCurrent += 1
+    plt.subplot(plotRows, plotCols, plotCurrent)
+    plt.plot(logData['timestamp'], logData['controller.rollRate'], '-', label='roll rate')
+    plt.plot(logData['timestamp'], logData['controller.pitchRate'], '-', label='pitch rate')
+    plt.plot(logData['timestamp'], logData['controller.yawRate'], '-', label='yaw rate')
+    plt.xlabel('timestamp [ms]')
+    plt.ylabel('desired')
+    plt.legend(loc=9, ncol=4, borderaxespad=0.)
 plt.show()
