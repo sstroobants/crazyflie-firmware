@@ -29,40 +29,29 @@
 
 #include "deck_core.h"
 
-struct __attribute__((__packed__)) serial_pid_in {
-    // thrust command (used for resetting the PID)
+struct __attribute__((__packed__)) serial_control_in {
     float thrust;
     //state
-    float roll; //estimated roll
-    float pitch; //estimated pitch
-    float yaw; //estimated yaw
-    //targets 
-    float roll_t; //roll target
-    float pitch_t; //pitch target
-    float yaw_t; //yaw target
-     //Rolling message out
-    // float rolling_msg_in;
-    // uint8_t rolling_msg_in_id;
+    float roll; //roll target
+    float pitch; //pitch target
+    // gyro values
+    float roll_gyro;
+    float pitch_gyro;
+    float yaw_gyro;
+    // accelerometer values
+    float x_acc;
+    float y_acc;
+    float z_acc;
     //CHECKSUM
     uint8_t checksum_in;
 };
 
-struct __attribute__((__packed__)) serial_pid_out {
-    //roll commands
-    float roll_p; //roll p
-    float roll_i; //roll i
-    float roll_d; //roll d
-    //pitch commands
-    float pitch_p; //pitch p
-    float pitch_i; //pitch i
-    float pitch_d; //pitch d
-    //yaw commands
-    float yaw_p; //yaw p
-    float yaw_i; //yaw i
-    float yaw_d; //yaw d
-     //Rolling message out
-    // float rolling_msg_out;
-    // uint8_t rolling_msg_out_id;
+struct __attribute__((__packed__)) serial_control_out {
+    //torque commands
+    float torque_x; //torque x
+    float torque_y; //torque y
+    float x_integ;
+    float y_integ;
     //CHECKSUM
     uint8_t checksum_out;
 };
@@ -73,14 +62,12 @@ bool teensyTest(void);
 void teensyTask(void* arg);
 
 extern bool teensyGetStatus(void);
-extern float teensyGetRollRateP(void);
-extern float teensyGetRollRateI(void);
-extern float teensyGetRollRateD(void);
-extern float teensyGetPitchRateP(void);
-extern float teensyGetPitchRateI(void);
-extern float teensyGetPitchRateD(void);
+extern float teensyGetRollTorque(void);
+extern float teensyGetPitchTorque(void);
+extern float teensyGetRollInteg(void);
+extern float teensyGetPitchInteg(void);
 
-extern struct serial_pid_out myserial_pid_out;
+extern struct serial_control_out myserial_control_out;
 extern bool status;
 
 #endif /* _TEENSY_H_ */

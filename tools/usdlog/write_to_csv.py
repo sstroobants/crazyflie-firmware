@@ -11,7 +11,7 @@ import numpy as np
 from scipy import stats
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--filename", type=str, default="tools/usdlog/log03")
+parser.add_argument("--filename", type=str, default="tools/usdlog/log01")
 args = parser.parse_args()
 
 # decode binary log data
@@ -39,36 +39,38 @@ for key in keys:
 
 # determine start and end points and clip data
 plt.subplot(1, 1, 1)
-plt.plot(logData['pid_rate.pitch_outP'], '-', label='p')
+plt.plot(logData['controller.actuatorThrust'], '-', label='p')
 plt.xlabel('index')
-plt.ylabel('rate pid')
+plt.ylabel('thrust')
 plt.legend(loc=9, ncol=4, borderaxespad=0.)
 plt.show()
+
+# plt.subplot(1, 1, 1)
+# plt.plot(logData['controller.pitch'], '-', label='p')
+# plt.plot(logData['stateEstimate.pitch'], '-', label='est p')
+# plt.xlabel('index')
+# plt.ylabel('thrust')
+# plt.legend(loc=9, ncol=4, borderaxespad=0.)
+# plt.show()
+
 inStr = input("start/end-time (start,end): ")
 start, end = map(int, inStr.split(','))
 data = data[start:end]
 
 # filter derivatives
-roll_outD_ma = data["pid_rate.roll_outD"].rolling(4).median()
+# roll_outD_ma = data["pid_rate.roll_outD"].rolling(4).median()
 # roll_outD_outliers = (np.abs(stats.zscore(data["pid_rate.roll_outD"])) > 2.5)
-roll_outD_outliers = (np.abs(data["pid_rate.roll_outD"] - roll_outD_ma) > 2000) 
+# roll_outD_outliers = (np.abs(data["pid_rate.roll_outD"] - roll_outD_ma) > 2000) 
 
-ax1=plt.subplot(2, 1, 1); 
-plt.plot(data["pid_rate.roll_outD"] - roll_outD_ma); 
-plt.subplot(2, 1, 2, sharex=ax1); 
-plt.plot(data["pid_rate.roll_outD"]); 
-plt.plot(data["pid_rate.roll_outD"][roll_outD_outliers == True], 'bo'); 
-data["pid_rate.roll_outD"][roll_outD_outliers] = roll_outD_ma[roll_outD_outliers]
-pitch_outD_ma = data["pid_rate.pitch_outD"].rolling(4).median()
-plt.plot(data["pid_rate.roll_outD"]); 
-plt.show()
-# pitch_outD_outliers = (np.abs(stats.zscore(data["pid_rate.pitch_outD"])) > 2.5)
-pitch_outD_outliers = (np.abs(data["pid_rate.pitch_outD"] - pitch_outD_ma) > 2000) 
-data["pid_rate.pitch_outD"][pitch_outD_outliers] = pitch_outD_ma[pitch_outD_outliers]
-# yaw_outD_ma = data["pid_rate.yaw_outD"].rolling(4).median()
-# yaw_outD_outliers = (np.abs(stats.zscore(data["pid_rate.yaw_outD"])) > 2.5)
-# yaw_outD_outliers = (np.abs(data["pid_rate.yaw_outD"] - yaw_outD_ma) > 2000) 
-# data["pid_rate.yaw_outD"][yaw_outD_outliers] = yaw_outD_ma[yaw_outD_outliers]
+# ax1=plt.subplot(2, 1, 1); 
+# plt.plot(data["pid_rate.roll_outD"] - roll_outD_ma); 
+# plt.subplot(2, 1, 2, sharex=ax1); 
+# plt.plot(data["pid_rate.roll_outD"]); 
+# plt.plot(data["pid_rate.roll_outD"][roll_outD_outliers == True], 'bo'); 
+# data["pid_rate.roll_outD"][roll_outD_outliers] = roll_outD_ma[roll_outD_outliers]
+# pitch_outD_ma = data["pid_rate.pitch_outD"].rolling(4).median()
+# plt.plot(data["pid_rate.roll_outD"]); 
+# plt.show()
 
 # write to .csv
 data.to_csv(f'{args.filename}.csv', index=False)

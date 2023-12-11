@@ -35,8 +35,14 @@
 #include "platform_defaults.h"
 #include "teensydeck.h"
 
+#define DEBUG_MODULE "ATT_PID"
+#include "debug.h"
+
 static bool attFiltEnable = ATTITUDE_LPF_ENABLE;
 static bool rateFiltEnable = ATTITUDE_RATE_LPF_ENABLE;
+static bool snnEnable = SNN_ENABLE;
+static int snnType = SNN_TYPE;
+static float snnCutoff = SNN_CUTOFF_ERR;
 static float attFiltCutoff = ATTITUDE_LPF_CUTOFF_FREQ;
 static float omxFiltCutoff = ATTITUDE_ROLL_RATE_LPF_CUTOFF_FREQ;
 static float omyFiltCutoff = ATTITUDE_PITCH_RATE_LPF_CUTOFF_FREQ;
@@ -97,10 +103,19 @@ PidObject pidYaw = {
 };
 
 static int16_t rollOutput;
-static int16_t rollOutputFake;
+static float rollOutputFake;
+static float rollRateDesiredSNN = 0.0f;
+static float rollRateDesiredFake = 0.0f;
+// static int16_t rollOutputFakeLowPass = 0;
 static int16_t pitchOutput;
-static int16_t pitchOutputFake;
+static float pitchOutputFake;
+static float pitchRateDesiredSNN = 0.0f;
+static float pitchRateDesiredFake = 0.0f;
+// static int16_t pitchOutputFakeLowPass = 0;
 static int16_t yawOutput;
+static float yawRateDesiredFake = 0.0f;
+
+bool usingSNN = false;
 
 static bool isInit;
 
@@ -145,29 +160,44 @@ void attitudeControllerCorrectRatePID(
        float rollRateDesired, float pitchRateDesired, float yawRateDesired)
 {
   pidSetDesired(&pidRollRate, rollRateDesired);
-  rollOutputFake = saturateSignedInt16(pidUpdate(&pidRollRate, rollRateActual, true));
-
   pidSetDesired(&pidPitchRate, pitchRateDesired);
-  pitchOutputFake = saturateSignedInt16(pidUpdate(&pidPitchRate, pitchRateActual, true));
+
+  rollOutputFake = pidUpdate(&pidRollRate, rollRateActual, true);
+  pitchOutputFake = pidUpdate(&pidPitchRate, pitchRateActual, true);
 
   // Get SNN PID values. If these are incorrect, fallback on real pid
-  if (teensyGetStatus()) {
-//   if (false) {
-    float snnRollPidOutput = 0.0f;
-    snnRollPidOutput += teensyGetRollRateP();
-    snnRollPidOutput += teensyGetRollRateI();
-    snnRollPidOutput += teensyGetRollRateD();
-    rollOutput = saturateSignedInt16(snnRollPidOutput);
-    float snnPitchPidOutput = 0.0f;
-    snnPitchPidOutput += teensyGetPitchRateP();
-    snnPitchPidOutput += teensyGetPitchRateI();
-    snnPitchPidOutput += teensyGetPitchRateD();
-    pitchOutput = saturateSignedInt16(snnPitchPidOutput);
+  // Also fall back on PID when error is too large
+  if (snnType == 1) {
+    if (snnEnable & teensyGetStatus() & (fabsf(rollRateDesired - rollRateActual) < snnCutoff) & (fabsf(pitchRateDesired - pitchRateActual) < snnCutoff)) {
+        usingSNN = true;    
+        float snnRollPidOutput = 0.0f;
+        snnRollPidOutput += teensyGetRollTorque();
+        // snnRollPidOutput += teensyGetRollInteg();
+        // Add integral term
+        // snnRollPidOutput += pidRoll.outI * 50;
+        // snnRollPidOutput += pidRollRate.outI;
+        rollOutput = snnRollPidOutput;
+        float snnPitchPidOutput = 0.0f;
+        snnPitchPidOutput += teensyGetPitchTorque();
+        // snnPitchPidOutput += teensyGetPitchInteg();
+        // Add integral term
+        // snnPitchPidOutput += pidPitch.outI * 50;
+        // snnPitchPidOutput += pidPitchRate.outI;
+        pitchOutput = snnPitchPidOutput;
+    } else {
+        usingSNN = false;
+        rollOutput = rollOutputFake;
+        pitchOutput = pitchOutputFake;
+    }
   } else {
+    // rollOutput = rollOutputFake + teensyGetRollInteg();
+    // pitchOutput = pitchOutputFake + teensyGetPitchInteg();
     rollOutput = rollOutputFake;
     pitchOutput = pitchOutputFake;
   }
 
+  rollOutput = saturateSignedInt16(rollOutput);
+  pitchOutput = saturateSignedInt16(pitchOutput);
   pidSetDesired(&pidYawRate, yawRateDesired);
 
   yawOutput = saturateSignedInt16(pidUpdate(&pidYawRate, yawRateActual, true));
@@ -179,11 +209,35 @@ void attitudeControllerCorrectAttitudePID(
        float* rollRateDesired, float* pitchRateDesired, float* yawRateDesired)
 {
   pidSetDesired(&pidRoll, eulerRollDesired);
-  *rollRateDesired = pidUpdate(&pidRoll, eulerRollActual, true);
-
+  rollRateDesiredFake = pidUpdate(&pidRoll, eulerRollActual, true);
+  rollRateDesiredSNN = 0.0f;
   // Update PID for pitch axis
   pidSetDesired(&pidPitch, eulerPitchDesired);
-  *pitchRateDesired = pidUpdate(&pidPitch, eulerPitchActual, true);
+  pitchRateDesiredFake = pidUpdate(&pidPitch, eulerPitchActual, true);
+  pitchRateDesiredSNN = 0.0f;
+
+    // Get SNN PID values. If these are incorrect, fallback on real pid
+  // Also fall back on PID when error is too large
+  if (snnType == 0) {
+    if (snnEnable & teensyGetStatus() & (fabsf(eulerRollDesired - eulerRollActual) < snnCutoff) & (fabsf(eulerPitchDesired - eulerPitchActual) < snnCutoff)) {
+        usingSNN = true;
+        float snnRollPidOutput = 0.0f;
+        snnRollPidOutput += teensyGetRollTorque();
+        *rollRateDesired = snnRollPidOutput;
+        rollRateDesiredSNN = snnRollPidOutput;
+        float snnPitchPidOutput = 0.0f;
+        snnPitchPidOutput += teensyGetPitchTorque();
+        *pitchRateDesired = snnPitchPidOutput;
+        pitchRateDesiredSNN = snnPitchPidOutput;
+    } else {
+        usingSNN = false;
+        *rollRateDesired = rollRateDesiredFake;
+        *pitchRateDesired = pitchRateDesiredFake;
+    }
+  } else {
+    *rollRateDesired = rollRateDesiredFake;
+    *pitchRateDesired = pitchRateDesiredFake;
+  }
 
   // Update PID for yaw axis
   float yawError;
@@ -194,6 +248,7 @@ void attitudeControllerCorrectAttitudePID(
     yawError += 360.0f;
   pidSetError(&pidYaw, yawError);
   *yawRateDesired = pidUpdate(&pidYaw, eulerYawActual, false);
+  yawRateDesiredFake = *yawRateDesired;
 }
 
 void attitudeControllerResetRollAttitudePID(void)
@@ -280,6 +335,26 @@ LOG_ADD(LOG_FLOAT, yaw_outD, &pidYaw.outD)
  * @brief Feedforward output yaw
  */
 LOG_ADD(LOG_FLOAT, yaw_outFF, &pidYaw.outFF)
+/**
+ * @brief total output of conv. pid pitch
+ */
+LOG_ADD(LOG_FLOAT, pitch_output, &pitchRateDesiredFake)
+/**
+ * @brief total output of conv. pid roll
+ */
+LOG_ADD(LOG_FLOAT, roll_output, &rollRateDesiredFake)
+/**
+ * @brief total output of conv. pid yaw
+ */
+LOG_ADD(LOG_FLOAT, yaw_output, &yawRateDesiredFake)
+// /**
+//  * @brief total output of snn pid pitch
+//  */
+// LOG_ADD(LOG_FLOAT, pitch_output_snn, &pitchRateDesiredSNN)
+// /**
+//  * @brief total output of snn pid roll
+//  */
+// LOG_ADD(LOG_FLOAT, roll_output_snn, &rollRateDesiredSNN)
 LOG_GROUP_STOP(pid_attitude)
 
 /**
@@ -337,7 +412,7 @@ LOG_ADD(LOG_FLOAT, yaw_outFF, &pidYawRate.outFF)
 /**
  * @brief total output of conv. pid roll
  */
-LOG_ADD(LOG_INT16, roll_output, &rollOutputFake)
+LOG_ADD(LOG_FLOAT, roll_output, &rollOutputFake)
 /**
  * @brief total output of snn pid roll
  */
@@ -345,11 +420,19 @@ LOG_ADD(LOG_INT16, roll_output_snn, &rollOutput)
 /**
  * @brief total output of conv. pid pitch
  */
-LOG_ADD(LOG_INT16, pitch_output, &pitchOutputFake)
+LOG_ADD(LOG_FLOAT, pitch_output, &pitchOutputFake)
+/**
+ * @brief total output of conv. pid yaw
+ */
+LOG_ADD(LOG_INT16, yaw_output, &yawOutput)
 /**
  * @brief total output of snn pid pitch
  */
 LOG_ADD(LOG_INT16, pitch_output_snn, &pitchOutput)
+/**
+ * @brief using snn controller or not
+ */
+LOG_ADD(LOG_INT16, usingSNN, &usingSNN)
 LOG_GROUP_STOP(pid_rate)
 
 /**
@@ -489,4 +572,16 @@ PARAM_ADD(PARAM_FLOAT | PARAM_PERSISTENT, omyFiltCut, &omyFiltCutoff)
  * @brief Low pass filter cut-off frequency, yaw axis (Hz)
  */
 PARAM_ADD(PARAM_FLOAT | PARAM_PERSISTENT, omzFiltCut, &omzFiltCutoff)
+/**
+ * @brief Use SNN controller
+ */
+PARAM_ADD(PARAM_INT8 | PARAM_PERSISTENT, snnEn, &snnEnable)
+/**
+ * @brief SNN controller type (0 = attitude, 1 = rate)
+ */
+PARAM_ADD(PARAM_INT16 | PARAM_PERSISTENT, snnType, &snnType)
+/**
+ * @brief If rate error is higher than this the SNN switches to PID
+ */
+PARAM_ADD(PARAM_FLOAT | PARAM_PERSISTENT, snnCutOff, &snnCutoff)
 PARAM_GROUP_STOP(pid_rate)

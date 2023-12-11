@@ -74,6 +74,15 @@
 #ifndef ATTITUDE_RATE_LPF_ENABLE
     #define ATTITUDE_RATE_LPF_ENABLE false
 #endif
+#ifndef SNN_ENABLE
+    #define SNN_ENABLE true
+#endif
+#ifndef SNN_TYPE
+    #define SNN_TYPE 1
+#endif
+#ifndef SNN_CUTOFF_ERR
+    #define SNN_CUTOFF_ERR 35.0f
+#endif
 #ifndef ATTITUDE_RATE_FF_YAW
     #define ATTITUDE_RATE_FF_YAW 0.0f
 #endif
