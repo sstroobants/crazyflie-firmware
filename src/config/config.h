@@ -102,7 +102,7 @@
 #define UART2_TASK_PRI          3
 #define CRTP_SRV_TASK_PRI       0
 #define PLATFORM_SRV_TASK_PRI   0
-#define TEENSY_TASK_PRI         0
+#define TEENSY_TASK_PRI         3
 
 // Not compiled
 #if 0
@@ -208,7 +208,7 @@
 #define KALMAN_TASK_STACKSIZE         (3 * configMINIMAL_STACK_SIZE)
 #define FLAPPERDECK_TASK_STACKSIZE    (2 * configMINIMAL_STACK_SIZE)
 #define ERROR_UKF_TASK_STACKSIZE      (4 * configMINIMAL_STACK_SIZE)
-#define TEENSY_TASK_STACKSIZE         (3 * configMINIMAL_STACK_SIZE)
+#define TEENSY_TASK_STACKSIZE         (4 * configMINIMAL_STACK_SIZE)
 
 //The radio channel. From 0 to 125
 #define RADIO_CHANNEL 80

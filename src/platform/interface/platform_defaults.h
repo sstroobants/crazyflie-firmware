@@ -77,8 +77,26 @@
 #ifndef SNN_ENABLE
     #define SNN_ENABLE true
 #endif
+#ifndef RAND_WALK_CONTROL
+    #define RAND_WALK_CONTROL false
+#endif
+#ifndef RAND_WALK_GAIN
+    #define RAND_WALK_GAIN 100.0f
+#endif
+#ifndef RAND_WALK_MAX
+    #define RAND_WALK_MAX 5000.0f
+#endif
+#ifndef RAND_WALK_TIMER
+    #define RAND_WALK_TIMER 300
+#endif
 #ifndef SNN_TYPE
     #define SNN_TYPE 1
+#endif
+#ifndef SNN_GAIN
+    #define SNN_GAIN 1.0f
+#endif
+#ifndef SNN_I_GAIN
+    #define SNN_I_GAIN 1.0f
 #endif
 #ifndef SNN_CUTOFF_ERR
     #define SNN_CUTOFF_ERR 35.0f

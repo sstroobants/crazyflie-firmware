@@ -11,7 +11,7 @@ import numpy as np
 from scipy import stats
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--filename", type=str, default="tools/usdlog/log01")
+parser.add_argument("--filename", type=str, default="tools/usdlog/pid_tests/log04")
 args = parser.parse_args()
 
 # decode binary log data
@@ -39,7 +39,7 @@ for key in keys:
 
 # determine start and end points and clip data
 plt.subplot(1, 1, 1)
-plt.plot(logData['controller.actuatorThrust'], '-', label='p')
+plt.plot(logData['posCtl.targetX'], '-', label='target x')
 plt.xlabel('index')
 plt.ylabel('thrust')
 plt.legend(loc=9, ncol=4, borderaxespad=0.)

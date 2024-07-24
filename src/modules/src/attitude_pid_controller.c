@@ -24,6 +24,7 @@
  * attitude_pid_controller.c: Attitude controller using PID correctors
  */
 #include <stdbool.h>
+#include <stdlib.h>
 
 #include "stabilizer_types.h"
 
@@ -34,20 +35,39 @@
 #include "commander.h"
 #include "platform_defaults.h"
 #include "teensydeck.h"
+#include "debug.h"
 
 #define DEBUG_MODULE "ATT_PID"
-#include "debug.h"
+
 
 static bool attFiltEnable = ATTITUDE_LPF_ENABLE;
 static bool rateFiltEnable = ATTITUDE_RATE_LPF_ENABLE;
 static bool snnEnable = SNN_ENABLE;
+static bool randWalk = RAND_WALK_CONTROL;
+static float randWalkGain = RAND_WALK_GAIN;
+static float randWalkMax = RAND_WALK_MAX;
+static int randWalkCounter = 0;
+static int randWalkTimer = RAND_WALK_TIMER;
 static int snnType = SNN_TYPE;
+static float snnGain = SNN_GAIN;
+static float snnIGain = SNN_I_GAIN;
 static float snnCutoff = SNN_CUTOFF_ERR;
 static float attFiltCutoff = ATTITUDE_LPF_CUTOFF_FREQ;
 static float omxFiltCutoff = ATTITUDE_ROLL_RATE_LPF_CUTOFF_FREQ;
 static float omyFiltCutoff = ATTITUDE_PITCH_RATE_LPF_CUTOFF_FREQ;
 static float omzFiltCutoff = ATTITUDE_YAW_RATE_LPF_CUTOFF_FREQ;
 static float yawMaxDelta = YAW_MAX_DELTA;
+
+
+static inline float saturateRandomWalk(float in)
+{
+  if (in > randWalkMax)
+    return randWalkMax;
+  else if (in < -randWalkMax)
+    return -randWalkMax;
+  else
+    return (float)in;
+}
 
 static inline int16_t saturateSignedInt16(float in)
 {
@@ -103,16 +123,21 @@ PidObject pidYaw = {
 };
 
 static int16_t rollOutput;
+static float rndWalkRoll = 0.0f;
+static float rollOutputFloat;
 static float rollOutputFake;
 static float rollRateDesiredSNN = 0.0f;
 static float rollRateDesiredFake = 0.0f;
-// static int16_t rollOutputFakeLowPass = 0;
 static int16_t pitchOutput;
+static float rndWalkPitch = 0.0f;
+static float pitchOutputFloat;
 static float pitchOutputFake;
 static float pitchRateDesiredSNN = 0.0f;
 static float pitchRateDesiredFake = 0.0f;
-// static int16_t pitchOutputFakeLowPass = 0;
 static int16_t yawOutput;
+static float rndWalkYaw = 0.0f;
+static float yawOutputFloat;
+static float yawOutputFake;
 static float yawRateDesiredFake = 0.0f;
 
 bool usingSNN = false;
@@ -161,46 +186,74 @@ void attitudeControllerCorrectRatePID(
 {
   pidSetDesired(&pidRollRate, rollRateDesired);
   pidSetDesired(&pidPitchRate, pitchRateDesired);
+  pidSetDesired(&pidYawRate, yawRateDesired);
 
   rollOutputFake = pidUpdate(&pidRollRate, rollRateActual, true);
   pitchOutputFake = pidUpdate(&pidPitchRate, pitchRateActual, true);
-
+  yawOutputFake = pidUpdate(&pidYawRate, yawRateActual, true);
   // Get SNN PID values. If these are incorrect, fallback on real pid
   // Also fall back on PID when error is too large
-  if (snnType == 1) {
-    if (snnEnable & teensyGetStatus() & (fabsf(rollRateDesired - rollRateActual) < snnCutoff) & (fabsf(pitchRateDesired - pitchRateActual) < snnCutoff)) {
-        usingSNN = true;    
-        float snnRollPidOutput = 0.0f;
-        snnRollPidOutput += teensyGetRollTorque();
-        // snnRollPidOutput += teensyGetRollInteg();
-        // Add integral term
-        // snnRollPidOutput += pidRoll.outI * 50;
-        // snnRollPidOutput += pidRollRate.outI;
-        rollOutput = snnRollPidOutput;
-        float snnPitchPidOutput = 0.0f;
-        snnPitchPidOutput += teensyGetPitchTorque();
-        // snnPitchPidOutput += teensyGetPitchInteg();
-        // Add integral term
-        // snnPitchPidOutput += pidPitch.outI * 50;
-        // snnPitchPidOutput += pidPitchRate.outI;
-        pitchOutput = snnPitchPidOutput;
+  if (snnEnable & teensyGetStatus()) {
+        if ((snnType == 1) || (snnType == 2) || (snnType == 3)) {
+            if ((fabsf(rollRateDesired - rollRateActual) < snnCutoff) & (fabsf(pitchRateDesired - pitchRateActual) < snnCutoff)) {
+                usingSNN = true;    
+                float snnRollPidOutput = 0.0f;
+                snnRollPidOutput += teensyGetRollTorque() * snnGain;
+                snnRollPidOutput += teensyGetRollInteg() * snnIGain;
+                // Add integral term
+                // snnRollPidOutput += pidRoll.outI * snnIGain;
+                // snnRollPidOutput += pidRollRate.outI;
+                rollOutputFloat = snnRollPidOutput;
+                float snnPitchPidOutput = 0.0f;
+                snnPitchPidOutput += teensyGetPitchTorque() * snnGain;
+                snnPitchPidOutput += teensyGetPitchInteg() * snnIGain;
+                // Add integral term
+                // snnPitchPidOutput += pidPitch.outI * snnIGain;
+                // snnPitchPidOutput += pidPitchRate.outI;
+                pitchOutputFloat = snnPitchPidOutput;
+                float snnYawPidOutput = 0.0f;
+                snnYawPidOutput += teensyGetYawTorque() * snnGain;
+                // snnYawPidOutput += teensyGetYawInteg() * snnIGain;
+                // snnYawPidOutput = yawOutputFake;
+                yawOutputFloat = snnYawPidOutput;
+            } else {
+                usingSNN = false;
+                rollOutputFloat = rollOutputFake;
+                pitchOutputFloat = pitchOutputFake;
+                yawOutputFloat = yawOutputFake;
+            }
+        } else if (snnType == 0) {
+            rollOutputFloat = rollOutputFake + teensyGetRollInteg() * snnIGain;
+            pitchOutputFloat = pitchOutputFake + teensyGetPitchInteg() * snnIGain;
+            yawOutputFloat = yawOutputFake;
+        }
     } else {
-        usingSNN = false;
-        rollOutput = rollOutputFake;
-        pitchOutput = pitchOutputFake;
+            rollOutputFloat = rollOutputFake;
+            pitchOutputFloat = pitchOutputFake;
+            yawOutputFloat = yawOutputFake;
     }
-  } else {
-    // rollOutput = rollOutputFake + teensyGetRollInteg();
-    // pitchOutput = pitchOutputFake + teensyGetPitchInteg();
-    rollOutput = rollOutputFake;
-    pitchOutput = pitchOutputFake;
+  
+  // Add random walk
+  if (randWalk) {
+    if (randWalkCounter++ > randWalkTimer) {
+        rndWalkRoll = saturateRandomWalk(rndWalkRoll + ((rand() / (float)RAND_MAX) - 0.5f) * randWalkGain);
+        rndWalkPitch = saturateRandomWalk(rndWalkPitch + ((rand() / (float)RAND_MAX) - 0.5f) * randWalkGain);
+        rndWalkYaw = saturateRandomWalk(rndWalkYaw + ((rand() / (float)RAND_MAX) - 0.5f) * randWalkGain);
+        randWalkCounter = 0;
+    }
+    rollOutputFloat += rndWalkRoll;
+    pitchOutputFloat += rndWalkPitch;
+    yawOutputFloat += rndWalkYaw;
+  }
+  else {
+    rndWalkRoll = 0.0f;
+    rndWalkPitch = 0.0f;
+    rndWalkYaw = 0.0f;
   }
 
-  rollOutput = saturateSignedInt16(rollOutput);
-  pitchOutput = saturateSignedInt16(pitchOutput);
-  pidSetDesired(&pidYawRate, yawRateDesired);
-
-  yawOutput = saturateSignedInt16(pidUpdate(&pidYawRate, yawRateActual, true));
+  rollOutput = saturateSignedInt16(rollOutputFloat);
+  pitchOutput = saturateSignedInt16(pitchOutputFloat);
+  yawOutput = saturateSignedInt16(yawOutputFloat);
 }
 
 void attitudeControllerCorrectAttitudePID(
@@ -222,11 +275,11 @@ void attitudeControllerCorrectAttitudePID(
     if (snnEnable & teensyGetStatus() & (fabsf(eulerRollDesired - eulerRollActual) < snnCutoff) & (fabsf(eulerPitchDesired - eulerPitchActual) < snnCutoff)) {
         usingSNN = true;
         float snnRollPidOutput = 0.0f;
-        snnRollPidOutput += teensyGetRollTorque();
+        snnRollPidOutput += teensyGetRollTorque() * snnGain;
         *rollRateDesired = snnRollPidOutput;
         rollRateDesiredSNN = snnRollPidOutput;
         float snnPitchPidOutput = 0.0f;
-        snnPitchPidOutput += teensyGetPitchTorque();
+        snnPitchPidOutput += teensyGetPitchTorque() * snnGain;
         *pitchRateDesired = snnPitchPidOutput;
         pitchRateDesiredSNN = snnPitchPidOutput;
     } else {
@@ -424,7 +477,7 @@ LOG_ADD(LOG_FLOAT, pitch_output, &pitchOutputFake)
 /**
  * @brief total output of conv. pid yaw
  */
-LOG_ADD(LOG_INT16, yaw_output, &yawOutput)
+LOG_ADD(LOG_INT16, yaw_output, &yawOutputFake)
 /**
  * @brief total output of snn pid pitch
  */
@@ -433,6 +486,18 @@ LOG_ADD(LOG_INT16, pitch_output_snn, &pitchOutput)
  * @brief using snn controller or not
  */
 LOG_ADD(LOG_INT16, usingSNN, &usingSNN)
+/**
+ * @brief 
+ */
+LOG_ADD(LOG_FLOAT, rnd_walk_roll, &rndWalkRoll)
+/**
+ * @brief 
+ */
+LOG_ADD(LOG_FLOAT, rnd_walk_pitch, &rndWalkPitch)
+/**
+ * @brief 
+ */
+LOG_ADD(LOG_FLOAT, rnd_walk_yaw, &rndWalkYaw)
 LOG_GROUP_STOP(pid_rate)
 
 /**
@@ -577,11 +642,35 @@ PARAM_ADD(PARAM_FLOAT | PARAM_PERSISTENT, omzFiltCut, &omzFiltCutoff)
  */
 PARAM_ADD(PARAM_INT8 | PARAM_PERSISTENT, snnEn, &snnEnable)
 /**
- * @brief SNN controller type (0 = attitude, 1 = rate)
+ * @brief SNN controller type (0 = rate controller, 1 = full torque controller, 2 = torque controller with rates as input)
  */
 PARAM_ADD(PARAM_INT16 | PARAM_PERSISTENT, snnType, &snnType)
 /**
  * @brief If rate error is higher than this the SNN switches to PID
  */
 PARAM_ADD(PARAM_FLOAT | PARAM_PERSISTENT, snnCutOff, &snnCutoff)
+/**
+ * @brief SNN gain
+ */
+PARAM_ADD(PARAM_FLOAT | PARAM_PERSISTENT, snnGain, &snnGain)
+/**
+ * @brief SNN I gain
+ */
+PARAM_ADD(PARAM_FLOAT | PARAM_PERSISTENT, snnIGain, &snnIGain)
+/**
+ * @brief random walk control
+ */
+PARAM_ADD(PARAM_INT8 | PARAM_PERSISTENT, randWalk, &randWalk)
+/**
+ * @brief random walk control gain
+ */
+PARAM_ADD(PARAM_FLOAT | PARAM_PERSISTENT, randWalkGain, &randWalkGain)
+/**
+ * @brief random walk control max
+ */
+PARAM_ADD(PARAM_FLOAT | PARAM_PERSISTENT, randWalkMax, &randWalkMax)
+/**
+ * @brief random walk timer max
+ */
+PARAM_ADD(PARAM_INT16 | PARAM_PERSISTENT, randWalkTimer, &randWalkTimer)
 PARAM_GROUP_STOP(pid_rate)

@@ -58,14 +58,23 @@ int serial_cf_received_packets = 0;
 bool receiving;
 bool sending;
 
+int receiving_outer = 0;
+int sending_outer = 0;
+int set_control_outer = 0;
+
 /////////////INTERNAL LOG VARIABLES
 logVarId_t idThrust;
 float thrust;
 logVarId_t idGyroX, idGyroY, idGyroZ, idAccX, idAccY, idAccZ;
 float gyroX, gyroY, gyroZ, accX, accY, accZ;
 logVarId_t idControllerRoll, idControllerPitch;
+logVarId_t idControllerRollRate, idControllerPitchRate, idControllerYawRate;
 float controllerRoll, controllerPitch;
-
+float  controllerRollRate, controllerPitchRate, controllerYawRate;
+logVarId_t idStateEstimateRoll, idStateEstimatePitch;
+float stateEstimateRoll, stateEstimatePitch;
+paramVarId_t idSnnType;
+int snnType;
 
 void serialParseMessageOut(void)
 {
@@ -85,8 +94,24 @@ void setControlInMessage(void)
     accX = logGetFloat(idAccX);
     accY = logGetFloat(idAccY);
     accZ = logGetFloat(idAccZ);
-    controllerRoll = logGetFloat(idControllerRoll);
-    controllerPitch = logGetFloat(idControllerPitch);
+    
+    snnType = paramGetInt(idSnnType);
+
+    if ((snnType == 0) || (snnType == 1) || (snnType == 3)){
+        controllerRoll = logGetFloat(idControllerRoll);
+        controllerPitch = logGetFloat(idControllerPitch);
+        controllerYawRate = logGetFloat(idControllerYawRate);
+    } 
+    if (snnType == 2) {
+        controllerRollRate = logGetFloat(idControllerRollRate);
+        controllerPitchRate = logGetFloat(idControllerPitchRate);
+        controllerYawRate = logGetFloat(idControllerYawRate);
+    }
+    if (snnType == 3) { 
+        stateEstimateRoll = logGetFloat(idStateEstimateRoll);
+        stateEstimatePitch = logGetFloat(idStateEstimatePitch);
+    }
+
     myserial_control_in.thrust = thrust;
     myserial_control_in.roll_gyro = gyroX;
     myserial_control_in.pitch_gyro = gyroY;
@@ -94,8 +119,20 @@ void setControlInMessage(void)
     myserial_control_in.x_acc = accX;
     myserial_control_in.y_acc = accY;
     myserial_control_in.z_acc = accZ;
-    myserial_control_in.roll = controllerRoll;
-    myserial_control_in.pitch = controllerPitch;
+    if ((snnType == 0) || (snnType == 1) || (snnType == 3) ){
+        myserial_control_in.roll = controllerRoll;
+        myserial_control_in.pitch = controllerPitch;
+        myserial_control_in.yaw = controllerYawRate;
+    } 
+    if (snnType == 2) {
+        myserial_control_in.roll = controllerRollRate;
+        myserial_control_in.pitch = controllerPitchRate;
+        myserial_control_in.yaw = controllerYawRate;
+    }
+    if (snnType == 3) {
+        myserial_control_in.x_acc = stateEstimatePitch;
+        myserial_control_in.y_acc = stateEstimateRoll;
+    }
 }
 
 // Read a control out message over uart
@@ -151,6 +188,8 @@ void uartSendControlInMessage(void)
     uint8_t startByte = START_BYTE_SERIAL_CF;
     uart1SendDataDmaBlocking(1, &startByte);
     uart1SendDataDmaBlocking(sizeof(struct serial_control_in), buf_send);
+    // uart1SendData(1, &startByte);
+    // uart1SendData(sizeof(struct serial_control_in), buf_send);
     // set sending is false after message is sent
     sending = false;
     receiving = true;
@@ -178,6 +217,12 @@ void teensyInit(DeckInfo* info)
   idThrust = logGetVarId("controller", "actuatorThrust");
   idControllerRoll = logGetVarId("controller", "roll");
   idControllerPitch = logGetVarId("controller", "pitch");
+  idControllerRollRate = logGetVarId("controller", "rollRate");
+  idControllerPitchRate = logGetVarId("controller", "pitchRate");
+  idControllerYawRate = logGetVarId("controller", "yawRate");
+  idSnnType = paramGetVarId("pid_rate", "snnType");
+  idStateEstimateRoll = logGetVarId("stateEstimate", "roll");
+  idStateEstimatePitch = logGetVarId("stateEstimate", "pitch");
 
   xTaskCreate(teensyTask, TEENSY_TASK_NAME, TEENSY_TASK_STACKSIZE, NULL, TEENSY_TASK_PRI, NULL);
 
@@ -206,37 +251,52 @@ void teensyTask(void* arg)
 
   while (1) {
     if (sending) {
+        uint32_t now_ms = T2M(xTaskGetTickCount());
         setControlInMessage();
+        uint32_t after = T2M(xTaskGetTickCount());
+        set_control_outer = set_control_outer + (after - now_ms);
         uartSendControlInMessage();
+        uint32_t after2 = T2M(xTaskGetTickCount());
+        sending_outer = sending_outer + (after2 - after);
     } else if (receiving) {
+        uint32_t now_ms = T2M(xTaskGetTickCount());
         uartReadControlOutMessage();
+        uint32_t after = T2M(xTaskGetTickCount());
+        receiving_outer = receiving_outer + (after - now_ms);
     } else {
-        vTaskDelayUntil(&xLastWakeTime, M2T(2));
+        vTaskDelayUntil(&xLastWakeTime, F2T(500));
         sending = true;
     }
     // Printing the amount of received messages over the last seconds
     uint32_t now_ms = T2M(xTaskGetTickCount());
     if (now_ms - xLastDebugTime > 1000) {
-        DEBUG_PRINT("received %i messages in the last second\n", serial_cf_received_packets);
+        DEBUG_PRINT("received %i messages in the last second, spent %i ms sending, %i, setting message, %i receiving\n", serial_cf_received_packets, sending_outer, set_control_outer, receiving_outer);
         serial_cf_received_packets = 0;
+        sending_outer = 0;
+        receiving_outer = 0;
+        set_control_outer = 0;
         xLastDebugTime = now_ms;
     }
   }
 }
 
-float teensyGetRollTorque(void) {
+int16_t teensyGetRollTorque(void) {
     return myserial_control_out.torque_x;
 }
 
-float teensyGetPitchTorque(void) {
+int16_t teensyGetPitchTorque(void) {
     return myserial_control_out.torque_y;
 }
 
-float teensyGetRollInteg(void) {
+int16_t teensyGetYawTorque(void) {
+    return myserial_control_out.torque_z;
+}
+
+int16_t teensyGetRollInteg(void) {
     return myserial_control_out.x_integ;
 }
 
-float teensyGetPitchInteg(void) {
+int16_t teensyGetPitchInteg(void) {
     return myserial_control_out.y_integ;
 }
 
@@ -266,11 +326,23 @@ LOG_GROUP_START(snn_control)
 /**
  * @brief SNN control roll torque
  */
-LOG_ADD(LOG_FLOAT, torque_roll, &myserial_control_out.torque_x)
+LOG_ADD(LOG_INT16, torque_roll, &myserial_control_out.torque_x)
 /**
  * @brief SNN control pitch torque
  */
-LOG_ADD(LOG_FLOAT, torque_pitch, &myserial_control_out.torque_y)
+LOG_ADD(LOG_INT16, torque_pitch, &myserial_control_out.torque_y)
+/**
+ * @brief SNN control yaw torque
+ */
+LOG_ADD(LOG_INT16, torque_yaw, &myserial_control_out.torque_z)
+/**
+ * @brief SNN control roll input
+ */
+LOG_ADD(LOG_FLOAT, roll_input, &myserial_control_in.roll)
+/**
+ * @brief SNN control pitch input
+ */
+LOG_ADD(LOG_FLOAT, pitch_input, &myserial_control_in.pitch)
 /**
  * @brief SNN control status
  */
@@ -278,11 +350,11 @@ LOG_ADD(LOG_UINT8, status, &status)
 /**
  * @brief SNN control roll torque integral
  */
-LOG_ADD(LOG_FLOAT, roll_integ, &myserial_control_out.x_integ)
+LOG_ADD(LOG_INT16, roll_integ, &myserial_control_out.x_integ)
 /**
  * @brief SNN control pitch torque integral
  */
-LOG_ADD(LOG_FLOAT, pitch_integ, &myserial_control_out.y_integ)
+LOG_ADD(LOG_INT16, pitch_integ, &myserial_control_out.y_integ)
 LOG_GROUP_STOP(snn_control)
 
 PARAM_GROUP_START(deck)

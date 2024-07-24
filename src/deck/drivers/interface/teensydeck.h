@@ -34,6 +34,7 @@ struct __attribute__((__packed__)) serial_control_in {
     //state
     float roll; //roll target
     float pitch; //pitch target
+    float yaw; //yaw rate target
     // gyro values
     float roll_gyro;
     float pitch_gyro;
@@ -48,10 +49,11 @@ struct __attribute__((__packed__)) serial_control_in {
 
 struct __attribute__((__packed__)) serial_control_out {
     //torque commands
-    float torque_x; //torque x
-    float torque_y; //torque y
-    float x_integ;
-    float y_integ;
+    int16_t torque_x; //torque x
+    int16_t torque_y; //torque y
+    int16_t torque_z; //torque z
+    int16_t x_integ;
+    int16_t y_integ;
     //CHECKSUM
     uint8_t checksum_out;
 };
@@ -62,10 +64,11 @@ bool teensyTest(void);
 void teensyTask(void* arg);
 
 extern bool teensyGetStatus(void);
-extern float teensyGetRollTorque(void);
-extern float teensyGetPitchTorque(void);
-extern float teensyGetRollInteg(void);
-extern float teensyGetPitchInteg(void);
+extern int16_t teensyGetRollTorque(void);
+extern int16_t teensyGetPitchTorque(void);
+extern int16_t teensyGetYawTorque(void);
+extern int16_t teensyGetRollInteg(void);
+extern int16_t teensyGetPitchInteg(void);
 
 extern struct serial_control_out myserial_control_out;
 extern bool status;

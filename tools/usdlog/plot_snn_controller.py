@@ -1,7 +1,7 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 
-data = pd.read_csv("tools/usdlog/log01.csv")
+data = pd.read_csv("tools/usdlog/log21.csv")
 
 fig, axes = plt.subplots(nrows=6, ncols=1, sharex=True)
 
@@ -53,14 +53,14 @@ axes[axs_id].axhline(0, 0, len(data["snn_control.torque_pitch"]), color='k')
 axes[axs_id].legend()
 axes[axs_id].set_title("Roll rate")
 axes[axs_id].set_xlabel("timestep (0.002ms)")
-axs_id += 1
-((data["snn_control.torque_roll"].rolling(2).mean() - data["gyro.x"])).cumsum().plot(ax=axes[axs_id], label="integ roll")
-(2 *data["snn_control.roll_integ"]).rolling(2).mean().plot(ax=axes[axs_id], label="snn roll")
-axes[axs_id].legend()
-axs_id += 1
-((data["snn_control.torque_pitch"].rolling(2).mean() + data["gyro.y"])).cumsum().plot(ax=axes[axs_id], label="integ pitch")
-(2 * data["snn_control.pitch_integ"]).rolling(2).mean().plot(ax=axes[axs_id], label="snn pitch")
-axes[axs_id].legend()
+# axs_id += 1
+# ((data["snn_control.torque_roll"].rolling(2).mean() - data["gyro.x"])).cumsum().plot(ax=axes[axs_id], label="integ roll")
+# (2 *data["snn_control.roll_integ"]).rolling(2).mean().plot(ax=axes[axs_id], label="snn roll")
+# axes[axs_id].legend()
+# axs_id += 1
+# ((data["snn_control.torque_pitch"].rolling(2).mean() + data["gyro.y"])).cumsum().plot(ax=axes[axs_id], label="integ pitch")
+# (2 * data["snn_control.pitch_integ"]).rolling(2).mean().plot(ax=axes[axs_id], label="snn pitch")
+# axes[axs_id].legend()
 
 
 # data["snn_control.pitch_integ"].rolling(2).mean().plot(ax=axes[axs_id], label="snn")
