@@ -11,7 +11,7 @@ import numpy as np
 from scipy import stats
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--filename", type=str, default="tools/usdlog/pid_tests/log04")
+parser.add_argument("--filename", type=str, default="tools/usdlog/log09")
 args = parser.parse_args()
 
 # decode binary log data
@@ -39,7 +39,7 @@ for key in keys:
 
 # determine start and end points and clip data
 plt.subplot(1, 1, 1)
-plt.plot(logData['posCtl.targetX'], '-', label='target x')
+plt.plot(logData['acc.z'], '-', label='acc z')
 plt.xlabel('index')
 plt.ylabel('thrust')
 plt.legend(loc=9, ncol=4, borderaxespad=0.)
@@ -54,9 +54,12 @@ plt.show()
 # plt.show()
 
 inStr = input("start/end-time (start,end): ")
-start, end = map(int, inStr.split(','))
-data = data[start:end]
-
+try:
+    start, end = map(int, inStr.split(','))
+    data = data[start:end]
+except ValueError:
+    print("Invalid input, logging entire dataset")
+    pass
 # filter derivatives
 # roll_outD_ma = data["pid_rate.roll_outD"].rolling(4).median()
 # roll_outD_outliers = (np.abs(stats.zscore(data["pid_rate.roll_outD"])) > 2.5)
@@ -71,6 +74,5 @@ data = data[start:end]
 # pitch_outD_ma = data["pid_rate.pitch_outD"].rolling(4).median()
 # plt.plot(data["pid_rate.roll_outD"]); 
 # plt.show()
-
 # write to .csv
 data.to_csv(f'{args.filename}.csv', index=False)

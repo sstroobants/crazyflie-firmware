@@ -1,7 +1,7 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 
-data = pd.read_csv("tools/usdlog/log21.csv")
+data = pd.read_csv("tools/usdlog/att_dist/lilac_wood.csv")
 
 fig, axes = plt.subplots(nrows=6, ncols=1, sharex=True)
 

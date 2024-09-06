@@ -1,36 +1,48 @@
 import pandas as pd
 import matplotlib.pyplot as plt
-import numpy as np
-import scipy.stats
+import os
 
+def plot_datasets(folder, axs_id, axes, color1, color2, title):
+    datasets = os.listdir(folder)
+    for dataset in datasets:
+        if not dataset.endswith(".csv"):
+            continue
+        data = pd.read_csv(f"{folder}/{dataset}")
+        data["timestamp"] = data["timestamp"] - data["timestamp"].iloc[0]
+        data = data[data["timestamp"] > 5000]
 
-avg_pearson_list = []
+        # # Plot time vs x  
+        axes[axs_id].plot(data["timestamp"], data["locSrv.x"], color=color1, alpha=0.5, linewidth=1.5, label="OptiTrack")
+        axes[axs_id].plot(data["timestamp"], data["ctrltarget.x"], color=color2, linewidth=3, label="Target")   
 
-fig, axes = plt.subplots(nrows=2, ncols=1, sharex=True, sharey=True)
+        # Plot x vs y
+        # axes[axs_id].plot(data["locSrv.x"], data["locSrv.y"], color=color1, alpha=0.5, linewidth=1.5, label="OptiTrack")
+        # axes[axs_id].plot(data["ctrltarget.x"], data["ctrltarget.y"], color=color2, linewidth=3, label="Target")
+
+    axes[axs_id].set_title(title, fontsize=14)
+    axes[axs_id].set_xlabel("Time (s)", fontsize=12)
+    axes[axs_id].set_ylabel("Position (x)", fontsize=12)
+    axes[axs_id].legend(["Optitrack", "Target"], fontsize=10)
+    axes[axs_id].grid(True)
+
+# Create a figure and axes
+fig, axes = plt.subplots(nrows=2, ncols=1, sharex=True, sharey=True, figsize=(6,6))
+
+# Colorblind-friendly colors
+color1 = "#1f77b4"  # Blue
+color2 = "#ff7f0e"  # Orange
+
+# SNN dataset
 axs_id = 0
-axes[axs_id].set_title("x vs y (SNN)")
-datasets = [f"snn_tests/log{i:02d}" for i in range(7, 12)]
-for dataset in datasets:
-    data = pd.read_csv(f"tools/usdlog/{dataset}.csv")
+snn_folder = "tools/usdlog/step_20_08/snn"
+plot_datasets(snn_folder, axs_id, axes, color1, color2, "x vs y (SNN)")
 
-    # plot x vs y   
-    data.plot(x="locSrv.x", y="locSrv.y", color="red", ax=axes[axs_id])
-    data.plot(x="posCtl.targetX", y="posCtl.targetY", color="blue", ax=axes[axs_id])
-axes[axs_id].set_xlabel("x")
-axes[axs_id].set_ylabel("y")
-axes[axs_id].legend(["optitrack", "target"])
-
+# PID dataset
 axs_id += 1
-axes[axs_id].set_title("x vs y (PID)")
-datasets = [f"pid_tests/log{i:02d}" for i in range(0, 5)]
-for dataset in datasets:
-    data = pd.read_csv(f"tools/usdlog/{dataset}.csv")
+pid_folder = "tools/usdlog/step_20_08/pid"
+plot_datasets(pid_folder, axs_id, axes, color1, color2, "x vs y (PID)")
 
-    # plot x vs y   
-    data.plot(x="locSrv.x", y="locSrv.y", color="red", ax=axes[axs_id])
-    data.plot(x="posCtl.targetX", y="posCtl.targetY", color="blue", ax=axes[axs_id])
-axes[axs_id].set_xlabel("x")
-axes[axs_id].set_ylabel("y")
-axes[axs_id].legend(["optitrack", "target"])
-
-plt.show()
+# Adjust layout
+plt.tight_layout()
+# plt.show()
+plt.savefig("tools/usdlog/snn_pid_comparison.png", dpi=300)

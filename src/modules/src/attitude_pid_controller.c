@@ -48,6 +48,13 @@ static float randWalkGain = RAND_WALK_GAIN;
 static float randWalkMax = RAND_WALK_MAX;
 static int randWalkCounter = 0;
 static int randWalkTimer = RAND_WALK_TIMER;
+static bool randDisturbance = RAND_DIST_CONTROL;
+static float randDisturbanceGain = RAND_DIST_GAIN;
+static float randDisturbanceChance = RAND_DIST_CHANCE;
+static int randDisturbanceTimer = RAND_DIST_TIMER;
+static int randDisturbanceRemaining = 10;
+static bool randSet = false;
+
 static int snnType = SNN_TYPE;
 static float snnGain = SNN_GAIN;
 static float snnIGain = SNN_I_GAIN;
@@ -124,18 +131,21 @@ PidObject pidYaw = {
 
 static int16_t rollOutput;
 static float rndWalkRoll = 0.0f;
+static float rollNoise = 0.0f;
 static float rollOutputFloat;
 static float rollOutputFake;
 static float rollRateDesiredSNN = 0.0f;
 static float rollRateDesiredFake = 0.0f;
 static int16_t pitchOutput;
 static float rndWalkPitch = 0.0f;
+static float pitchNoise = 0.0f;
 static float pitchOutputFloat;
 static float pitchOutputFake;
 static float pitchRateDesiredSNN = 0.0f;
 static float pitchRateDesiredFake = 0.0f;
 static int16_t yawOutput;
 static float rndWalkYaw = 0.0f;
+static float yawNoise = 0.0f;
 static float yawOutputFloat;
 static float yawOutputFake;
 static float yawRateDesiredFake = 0.0f;
@@ -249,6 +259,30 @@ void attitudeControllerCorrectRatePID(
     rndWalkRoll = 0.0f;
     rndWalkPitch = 0.0f;
     rndWalkYaw = 0.0f;
+  }
+
+  // Add random disturbance
+  if (randDisturbance) {
+    if (!randSet) {
+      if ((rand() / (float)RAND_MAX) < randDisturbanceChance) {
+        rollNoise = ((rand() / (float)RAND_MAX) - 0.5f) * randDisturbanceGain;
+        pitchNoise = ((rand() / (float)RAND_MAX) - 0.5f) * randDisturbanceGain;
+        yawNoise = ((rand() / (float)RAND_MAX) - 0.5f) * 0.05f * randDisturbanceGain;
+        randSet = true;
+      }
+    }
+    else {
+      if (randDisturbanceRemaining >= 0) {
+        rollOutputFloat += rollNoise;
+        pitchOutputFloat += pitchNoise;
+        yawOutputFloat += yawNoise;
+        randDisturbanceRemaining--;
+      }
+      else {
+        randDisturbanceRemaining = randDisturbanceTimer;
+        randSet = false;
+      }
+    }
   }
 
   rollOutput = saturateSignedInt16(rollOutputFloat);
@@ -477,7 +511,7 @@ LOG_ADD(LOG_FLOAT, pitch_output, &pitchOutputFake)
 /**
  * @brief total output of conv. pid yaw
  */
-LOG_ADD(LOG_INT16, yaw_output, &yawOutputFake)
+LOG_ADD(LOG_FLOAT, yaw_output, &yawOutputFake)
 /**
  * @brief total output of snn pid pitch
  */
@@ -657,6 +691,8 @@ PARAM_ADD(PARAM_FLOAT | PARAM_PERSISTENT, snnGain, &snnGain)
  * @brief SNN I gain
  */
 PARAM_ADD(PARAM_FLOAT | PARAM_PERSISTENT, snnIGain, &snnIGain)
+PARAM_GROUP_STOP(pid_rate)
+PARAM_GROUP_START(rand_noise)
 /**
  * @brief random walk control
  */
@@ -673,4 +709,20 @@ PARAM_ADD(PARAM_FLOAT | PARAM_PERSISTENT, randWalkMax, &randWalkMax)
  * @brief random walk timer max
  */
 PARAM_ADD(PARAM_INT16 | PARAM_PERSISTENT, randWalkTimer, &randWalkTimer)
-PARAM_GROUP_STOP(pid_rate)
+/**
+ * @brief random disturbance control
+ */
+PARAM_ADD(PARAM_INT8 | PARAM_PERSISTENT, randDist, &randDisturbance)
+/**
+ * @brief random disturbance control gain
+ */
+PARAM_ADD(PARAM_FLOAT | PARAM_PERSISTENT, randDistGain, &randDisturbanceGain)
+/**
+ * @brief random disturbance duration in timesteps
+ */
+PARAM_ADD(PARAM_INT16 | PARAM_PERSISTENT, randDistTimer, &randDisturbanceTimer)
+/**
+ * @brief random disturbance chance of happening per timestep
+ */
+PARAM_ADD(PARAM_FLOAT | PARAM_PERSISTENT, randDistChance, &randDisturbanceChance)
+PARAM_GROUP_STOP(rand_noise)

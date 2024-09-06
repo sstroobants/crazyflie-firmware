@@ -89,6 +89,18 @@
 #ifndef RAND_WALK_TIMER
     #define RAND_WALK_TIMER 300
 #endif
+#ifndef RAND_DIST_CONTROL
+    #define RAND_DIST_CONTROL false
+#endif
+#ifndef RAND_DIST_GAIN
+    #define RAND_DIST_GAIN 15000.0f
+#endif
+#ifndef RAND_DIST_TIMER
+    #define RAND_DIST_TIMER 100
+#endif
+#ifndef RAND_DIST_CHANCE
+    #define RAND_DIST_CHANCE 0.0075f
+#endif
 #ifndef SNN_TYPE
     #define SNN_TYPE 1
 #endif
