@@ -1,3 +1,5 @@
+/tools/usdlog/logs/*
+
 build_info.json
 
 ^bin/dep/all
