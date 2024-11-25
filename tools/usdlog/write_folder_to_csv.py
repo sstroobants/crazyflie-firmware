@@ -3,16 +3,12 @@
 code to write usd logged crazyflie data to csv in format used for the snn pid
 """
 import cfusdlog
-import matplotlib.pyplot as plt
-import re
 import argparse
 import pandas as pd
-import numpy as np
-from scipy import stats
 import os
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--folder_name", type=str, default="tools/usdlog/05_09/att_dist/crimson_dew")
+parser.add_argument("--folder_name", type=str, default="tools/usdlog/logs/05_09/att_dist/sandy_hill")
 args = parser.parse_args()
 
 # get all files in folder

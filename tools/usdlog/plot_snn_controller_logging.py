@@ -4,21 +4,16 @@ import numpy as np
 import scipy.stats
 import scipy.signal
 import torch
-from sklearn.metrics import mutual_info_score
-
 
 avg_pearson_list = []
 avg_mse_list = []
 # datasets = ["att_dist/lilac_wood", "att_dist/crimson_dew"]
 # datasets = ["crazyflie_v6/snn/log03", "att_dist/crimson_dew"]
-datasets = ["27_08/att_dist/lilac_wood/log02"]
+datasets = ["27_08/att_dist/lilac_wood/log02"] # TODO make parameter as argument
 title_fontsize = 10
 legend_loc = "upper right"
 for dataset in datasets:
-    data = pd.read_csv(f"tools/usdlog/{dataset}.csv")
-    # skip begin and end
-    # data = data[2000:10000]
-
+    data = pd.read_csv(f"tools/usdlog/logs/{dataset}.csv")
     fig, axes = plt.subplots(nrows=6, ncols=1, sharex=True, figsize=[6, 9])
 
     axs_id = 0
@@ -64,12 +59,7 @@ for dataset in datasets:
     axs_id += 1
     axes[axs_id].set_title("Roll torque command", fontsize=title_fontsize)
     (data["pid_rate.pitch_output"] - data["pid_rate.pitch_outI"]).plot(ax=axes[axs_id], label="pid pitch")
-    # (data["pid_rate.pitch_output"]).plot(ax=axes[axs_id], label="pid pitch")
     data["snn_control.torque_pitch"].shift(0).fillna(0).plot(ax=axes[axs_id], label="snn pitch")
-    # data["pid_rate.pitch_output_snn"].shift(0).fillna(0).plot(ax=axes[axs_id], label="snn pitch")
-    # (data["pid_rate.pitch_outI"]).plot(ax=axes[axs_id], label="pid pitch")
-    # data["snn_control.pitch_integ"].plot(ax=axes[axs_id], label="snn integ")
-    # data["pid_rate.roll_output"].plot(ax=axes[axs_id], label="pid roll")
     axes[axs_id].set_ylim([-20000, 20000])
     axes[axs_id].legend(loc=legend_loc)
 
@@ -78,17 +68,10 @@ for dataset in datasets:
     (data["pid_rate.roll_output"] - data["pid_rate.roll_outI"]).plot(ax=axes[axs_id], label="pid roll")
     # (data["pid_rate.roll_output"]).plot(ax=axes[axs_id], label="pid roll")
     data["snn_control.torque_roll"].shift(0).fillna(0).plot(ax=axes[axs_id], label="snn roll")
-    # data["pid_rate.roll_output_snn"].shift(0).fillna(0).plot(ax=axes[axs_id], label="snn roll")
-    # data["pid_rate.pitch_outI"].plot(ax=axes[axs_id], label="pid pitch")
-    # (data["pid_rate.roll_outI"]).plot(ax=axes[axs_id], label="integ roll")
-    # data["snn_control.roll_integ"].plot(ax=axes[axs_id], label="snn integ")
     axes[axs_id].set_ylim([-20000, 20000])
-    # axes[axs_id].set_xlim([4000, 7000])
     axes[axs_id].legend(loc=legend_loc)
 
     fig.tight_layout()
-
-    # plt.show()
 
     pitch_list = []
     roll_list = []
@@ -96,13 +79,6 @@ for dataset in datasets:
     avg_mse = []
     pearson_first = None
     for i in range(0, -13, -1):
-        # calculate correlation coeff for different shifted outputs
-        # print(scipy.stats.pearsonr((data["pid_rate.pitch_output"] - data["pid_rate.pitch_outI"]), data["snn_control.torque_pitch"].shift(i).fillna(0)))
-        # print(scipy.stats.pearsonr((data["pid_rate.roll_output"] - data["pid_rate.roll_outI"]), data["snn_control.torque_roll"].shift(i).fillna(0)))
-        # print("\n")
-        # pitch = scipy.stats.pearsonr((data["pid_rate.pitch_output"] - data["pid_rate.pitch_outI"]), data["snn_control.torque_pitch"].shift(i).fillna(0))
-        # roll = scipy.stats.pearsonr((data["pid_rate.roll_output"] - data["pid_rate.roll_outI"]), data["snn_control.torque_roll"].shift(i).fillna(0))
-
         pitch = scipy.stats.pearsonr((data["pid_rate.pitch_output"] - data["pid_rate.pitch_outI"]), data["snn_control.torque_pitch"].shift(i).fillna(0))
         roll = scipy.stats.pearsonr((data["pid_rate.roll_output"] - data["pid_rate.roll_outI"]), data["snn_control.torque_roll"].shift(i).fillna(0))
         
@@ -114,11 +90,7 @@ for dataset in datasets:
         roll_list.append(roll[0])
 
         avg_mse.append((pitch_mse + roll_mse) / 2)
-        
-        # if pearson_first is None:
-        #     pearson_first = avg_prs
-        # avg_prs = avg_prs + (1 - pearson_first)
-        # print(avg_prs)
+
         avg_pearson.append(np.array(avg_prs))
     print(f"[{dataset}] Avg max: {np.argmax(avg_pearson)}, pitch max: {np.argmax(pitch_list)}, roll max: {np.argmax(roll_list)}")
     avg_pearson_list.append(avg_pearson)
@@ -132,15 +104,7 @@ for dataset, name in zip(avg_pearson_list, ["trained delayed", "trained non-dela
     dataset = dataset #- np.max(dataset)
     plt.plot(dataset, label=name)
 plt.ylabel("shifted pearson correlation")
-# ax2 = ax.twinx()
-# plt.ylabel("MSE")
-# for dataset, name in zip(avg_mse_list, ["trained delayed", "trained non-delayed"]):
-#     dataset = dataset #- np.max(dataset)
-#     ax2.plot(dataset, label=name)
-# plt.plot(pitch_list, label="pitch")
-# plt.plot(roll_list, label="roll")
 plt.xlabel("shift [timesteps]")
-# plt.yticks([])
 plt.legend()
 plt.grid()
 plt.tight_layout()
