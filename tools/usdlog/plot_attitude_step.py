@@ -23,12 +23,12 @@ folders = ["tools/usdlog/logs/05_09/att_dist/lilac_wood",
            "tools/usdlog/logs/05_09/att_dist/crimson_dew", 
            "tools/usdlog/logs/05_09/att_dist/desert_snow", 
            "tools/usdlog/logs/05_09/att_dist/sandy_hill", 
-           "tools/usdlog/logs/05_09/att_dist/pid"]
+           "tools/usdlog/logs/22_01/att_dist/pid"]
 
 colors = ["#2c7bb6", "#ff7f00", "#33a02c", "black", "#d7191c"]
 
 names = ["A) SNN (augmented \& time-shifted)", 
-         "B) SNN (augmented)", 
+         "B) SNN (augmented)",  
          "C) SNN (time-shifted)", 
          "D) SNN (baseline)",
          "E) PID (reference)"]
@@ -135,6 +135,7 @@ for folder in folders:
         # calculate std of state vs average 
         std_list.append(np.std(data["stateEstimate.roll"] - avg_response_roll))
 
+    print(mse_list)
 
     # print avg mse for the folder
     print(f"{folder.split('/')[-1]} avg mse: {sum(mse_list) / len(mse_list)}")

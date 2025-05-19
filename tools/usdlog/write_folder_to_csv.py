@@ -8,7 +8,7 @@ import pandas as pd
 import os
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--folder_name", type=str, default="tools/usdlog/logs/05_09/att_dist/sandy_hill")
+parser.add_argument("--folder_name", type=str, default="tools/usdlog/logs/22_01/att_dist/pid")
 args = parser.parse_args()
 
 # get all files in folder

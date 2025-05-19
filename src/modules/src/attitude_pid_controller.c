@@ -204,7 +204,7 @@ void attitudeControllerCorrectRatePID(
   // Get SNN PID values. If these are incorrect, fallback on real pid
   // Also fall back on PID when error is too large
   if (snnEnable & teensyGetStatus()) {
-        if ((snnType == 1) || (snnType == 2) || (snnType == 3)) {
+        if ((snnType == 1) || (snnType == 2) || (snnType == 3) || (snnType == 4)) {
             if ((fabsf(rollRateDesired - rollRateActual) < snnCutoff) & (fabsf(pitchRateDesired - pitchRateActual) < snnCutoff)) {
                 usingSNN = true;    
                 float snnRollPidOutput = 0.0f;

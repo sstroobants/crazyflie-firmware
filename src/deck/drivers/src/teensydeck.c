@@ -75,6 +75,8 @@ logVarId_t idStateEstimateRoll, idStateEstimatePitch;
 float stateEstimateRoll, stateEstimatePitch;
 paramVarId_t idSnnType;
 int snnType;
+logVarId_t idPidRateRollOutput, idPidRatePitchOutput, idPidRateYawOutput;
+float pidRateRollOutput, pidRatePitchOutput, pidRateYawOutput;
 
 void serialParseMessageOut(void)
 {
@@ -111,6 +113,11 @@ void setControlInMessage(void)
         stateEstimateRoll = logGetFloat(idStateEstimateRoll);
         stateEstimatePitch = logGetFloat(idStateEstimatePitch);
     }
+    if (snnType == 4) {
+        pidRateRollOutput = logGetFloat(idPidRateRollOutput);
+        pidRatePitchOutput = logGetFloat(idPidRatePitchOutput);
+        pidRateYawOutput = logGetFloat(idPidRateYawOutput);
+    }
 
     myserial_control_in.thrust = thrust;
     myserial_control_in.roll_gyro = gyroX;
@@ -132,6 +139,11 @@ void setControlInMessage(void)
     if (snnType == 3) {
         myserial_control_in.x_acc = stateEstimatePitch;
         myserial_control_in.y_acc = stateEstimateRoll;
+    } 
+    if (snnType == 4) {
+        myserial_control_in.roll = pidRateRollOutput;
+        myserial_control_in.pitch = pidRatePitchOutput;
+        myserial_control_in.yaw = pidRateYawOutput;
     }
 }
 
@@ -223,6 +235,9 @@ void teensyInit(DeckInfo* info)
   idSnnType = paramGetVarId("pid_rate", "snnType");
   idStateEstimateRoll = logGetVarId("stateEstimate", "roll");
   idStateEstimatePitch = logGetVarId("stateEstimate", "pitch");
+  idPidRateRollOutput = logGetVarId("pid_rate", "roll_output");
+  idPidRatePitchOutput = logGetVarId("pid_rate", "pitch_output");
+  idPidRateYawOutput = logGetVarId("pid_rate", "yaw_output");
 
   xTaskCreate(teensyTask, TEENSY_TASK_NAME, TEENSY_TASK_STACKSIZE, NULL, TEENSY_TASK_PRI, NULL);
 
