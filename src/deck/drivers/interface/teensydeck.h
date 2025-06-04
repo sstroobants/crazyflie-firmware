@@ -48,12 +48,11 @@ struct __attribute__((__packed__)) serial_control_in {
 };
 
 struct __attribute__((__packed__)) serial_control_out {
-    //torque commands
-    int16_t torque_x; //torque x
-    int16_t torque_y; //torque y
-    int16_t torque_z; //torque z
-    int16_t x_integ;
-    int16_t y_integ;
+    // measured avg distance left-to-right
+    int16_t dist_ll;
+    int16_t dist_ml;
+    int16_t dist_mr;
+    int16_t dist_rr;
     //CHECKSUM
     uint8_t checksum_out;
 };
@@ -64,11 +63,6 @@ bool teensyTest(void);
 void teensyTask(void* arg);
 
 extern bool teensyGetStatus(void);
-extern int16_t teensyGetRollTorque(void);
-extern int16_t teensyGetPitchTorque(void);
-extern int16_t teensyGetYawTorque(void);
-extern int16_t teensyGetRollInteg(void);
-extern int16_t teensyGetPitchInteg(void);
 
 extern struct serial_control_out myserial_control_out;
 extern bool status;

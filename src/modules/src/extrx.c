@@ -74,6 +74,7 @@
 #define EXTRX_CH_ALTHOLD   4
 #define EXTRX_CH_ARM       5
 #define EXTRX_CH_MODE     6
+#define EXTRX_CH_TEST     7
 
 #define EXTRX_SIGN_ALTHOLD   (-1)
 #define EXTRX_SIGN_ARM       (-1)
@@ -261,6 +262,15 @@ static void extRxDecodeChannels(void)
     extrxSetpoint.attitude.pitch = EXTRX_SIGN_PITCH * getCPPMPitchScale() * cppmConvert2Float(ch[EXTRX_CH_PITCH], -1, 1, EXTRX_DEADBAND_PITCH);
   }
   extrxSetpoint.attitudeRate.yaw = EXTRX_SIGN_YAW * getCPPMYawRateScale() * cppmConvert2Float(ch[EXTRX_CH_YAW], -1, 1, EXTRX_DEADBAND_YAW);
+
+  // static bool mySwitch = false;
+  // if (cppmConvert2Float(ch[EXTRX_CH_TEST], -1, 1, 0.0) > 0.5f) {
+  //     mySwitch = true;
+  //     DEBUG_PRINT("Switched test mode\n");
+  // } else {
+  //     mySwitch = false;
+  //     DEBUG_PRINT("Switched normal mode\n");
+  // }
 
   commanderSetSetpoint(&extrxSetpoint, COMMANDER_PRIORITY_EXTRX);
 }

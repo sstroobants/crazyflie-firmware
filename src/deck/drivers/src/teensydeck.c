@@ -60,7 +60,6 @@ bool sending;
 
 int receiving_outer = 0;
 int sending_outer = 0;
-int set_control_outer = 0;
 
 /////////////INTERNAL LOG VARIABLES
 logVarId_t idThrust;
@@ -115,8 +114,9 @@ void setControlInMessage(void)
 void uartReadControlOutMessage(void) 
 {
     uint8_t serial_cf_byte_in;
-    // uart1Getchar(&serial_cf_byte_in);
-    if (!uart1GetDataWithTimeout(&serial_cf_byte_in, 100)) {
+    // uart2Getchar(&serial_cf_byte_in);
+    // if (!uart1GetCharWithTimeout(&serial_cf_byte_in, 100)) {
+    if (!uart1GetDataWithTimeout(&serial_cf_byte_in, 200)) {
         receiving = false;
         // if status was true, set it to false for debugging purposes
         if (status) {
@@ -162,10 +162,12 @@ void uartSendControlInMessage(void)
         myserial_control_in.checksum_in += buf_send [i];
     }
     uint8_t startByte = START_BYTE_SERIAL_CF;
-    uart1SendDataDmaBlocking(1, &startByte);
-    uart1SendDataDmaBlocking(sizeof(struct serial_control_in), buf_send);
-    // uart1SendData(1, &startByte);
-    // uart1SendData(sizeof(struct serial_control_in), buf_send);
+    // uart1SendDataDmaBlocking(1, &startByte);
+    uart1SendData(1, &startByte);
+    // uart2SendDataDmaBlocking(sizeof(struct serial_control_in), buf_send);
+    uart1SendData(sizeof(struct serial_control_in), buf_send);
+    // uart2SendData(1, &startByte);
+    // uart2SendData(sizeof(struct serial_control_in), buf_send);
     // set sending is false after message is sent
     sending = false;
     receiving = true;
@@ -176,13 +178,17 @@ void teensyInit(DeckInfo* info)
 {
   if (isInit)
     return;
+
+    
+    
   // initialize connection with the Teensy
   // at baudrate 115200, 500hz not achieved
   // at baudrate 460800, seems to work
   // at baudrate 921600, module seems to crash
   uart1Init(460800);
-
-
+  //   uart1Init(115200);
+  
+  
   // get the logVarIds that are used to get the state/target info
   idGyroX = logGetVarId("gyro", "x");
   idGyroY = logGetVarId("gyro", "y");
@@ -196,25 +202,25 @@ void teensyInit(DeckInfo* info)
   idControllerRollRate = logGetVarId("controller", "rollRate");
   idControllerPitchRate = logGetVarId("controller", "pitchRate");
   idControllerYawRate = logGetVarId("controller", "yawRate");
-  idSnnType = paramGetVarId("pid_rate", "snnType");
   idStateEstimateRoll = logGetVarId("stateEstimate", "roll");
   idStateEstimatePitch = logGetVarId("stateEstimate", "pitch");
   idPidRateRollOutput = logGetVarId("pid_rate", "roll_output");
   idPidRatePitchOutput = logGetVarId("pid_rate", "pitch_output");
   idPidRateYawOutput = logGetVarId("pid_rate", "yaw_output");
-
+  
+//   Add delay to ensure the deck is ready before starting
+  vTaskDelay(M2T(1000)); // Delay for 1 seconds (1000 ms)
   xTaskCreate(teensyTask, TEENSY_TASK_NAME, TEENSY_TASK_STACKSIZE, NULL, TEENSY_TASK_PRI, NULL);
-
+  
   DEBUG_PRINT("FINISHED CREATING TASK\n");
-  status = true;
   isInit = true;
 }
 
 bool teensyTest(void)
 {
-  if (!isInit)
+    if (!isInit)
     return false;
-  else
+    else
     return true;
 }
 
@@ -230,10 +236,8 @@ void teensyTask(void* arg)
 
   while (1) {
     if (sending) {
-        uint32_t now_ms = T2M(xTaskGetTickCount());
         setControlInMessage();
         uint32_t after = T2M(xTaskGetTickCount());
-        set_control_outer = set_control_outer + (after - now_ms);
         uartSendControlInMessage();
         uint32_t after2 = T2M(xTaskGetTickCount());
         sending_outer = sending_outer + (after2 - after);
@@ -243,40 +247,20 @@ void teensyTask(void* arg)
         uint32_t after = T2M(xTaskGetTickCount());
         receiving_outer = receiving_outer + (after - now_ms);
     } else {
-        vTaskDelayUntil(&xLastWakeTime, F2T(500));
+        vTaskDelayUntil(&xLastWakeTime, F2T(100));
         sending = true;
     }
     // Printing the amount of received messages over the last seconds
     uint32_t now_ms = T2M(xTaskGetTickCount());
     if (now_ms - xLastDebugTime > 1000) {
-        DEBUG_PRINT("received %i messages in the last second, spent %i ms sending, %i, setting message, %i receiving\n", serial_cf_received_packets, sending_outer, set_control_outer, receiving_outer);
+        DEBUG_PRINT("received %i messages in the last second, spent %i ms sending, %i receiving\n", serial_cf_received_packets, sending_outer, receiving_outer);
+        DEBUG_PRINT("Last received message: ll: %i, ml: %i, mr: %i, rr: %i \n", myserial_control_out.dist_ll, myserial_control_out.dist_ml, myserial_control_out.dist_mr, myserial_control_out.dist_rr);
         serial_cf_received_packets = 0;
         sending_outer = 0;
         receiving_outer = 0;
-        set_control_outer = 0;
         xLastDebugTime = now_ms;
     }
   }
-}
-
-int16_t teensyGetRollTorque(void) {
-    return myserial_control_out.torque_x;
-}
-
-int16_t teensyGetPitchTorque(void) {
-    return myserial_control_out.torque_y;
-}
-
-int16_t teensyGetYawTorque(void) {
-    return myserial_control_out.torque_z;
-}
-
-int16_t teensyGetRollInteg(void) {
-    return myserial_control_out.x_integ;
-}
-
-int16_t teensyGetPitchInteg(void) {
-    return myserial_control_out.y_integ;
 }
 
 bool teensyGetStatus(void) {
@@ -303,7 +287,7 @@ DECK_DRIVER(teensy_deck);
  */
 LOG_GROUP_START(teensy)
 /**
- * @brief SNN control status
+ * @brief teensy control status
  */
 LOG_ADD(LOG_UINT8, status, &status)
 LOG_GROUP_STOP(teensy)

@@ -36,6 +36,8 @@
 #include "quatcompress.h"
 #include "FreeRTOS.h"
 
+#include "debug.h"
+
 /* The generic commander format contains a packet type and data that has to be
  * decoded into a setpoint_t structure. The aim is to make it future-proof
  * by easily allowing the addition of new packets for future use cases.
@@ -312,9 +314,11 @@ float getCPPMYawRateScale()
 static void cppmEmuDecoder(setpoint_t *setpoint, uint8_t type, const void *data, size_t datalen)
 {
   bool isSelfLevelEnabled = true;
-
+  
   ASSERT(datalen >= 9); // minimum 9 bytes expected - 1byte header + four 2byte channels
   const struct cppmEmuPacket_s *values = data;
+  // aux0 = self-level enable/disable
+  // aux3 = test channel for flapper autonomous modes
   ASSERT(datalen == 9 + (2*values->hdr.numAuxChannels)); // Total size is 9 + number of active aux channels
 
   // Aux channel 0 is reserved for enabling/disabling self-leveling
