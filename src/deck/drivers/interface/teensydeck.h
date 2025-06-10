@@ -49,10 +49,15 @@ struct __attribute__((__packed__)) serial_control_in {
 
 struct __attribute__((__packed__)) serial_control_out {
     // measured avg distance left-to-right
-    int16_t dist_ll;
-    int16_t dist_ml;
-    int16_t dist_mr;
-    int16_t dist_rr;
+    int16_t dist_ll_bottom;
+    int16_t dist_ml_bottom;
+    int16_t dist_mr_bottom;
+    int16_t dist_rr_bottom;
+
+    int16_t dist_ll_forward;
+    int16_t dist_ml_forward;
+    int16_t dist_mr_forward;
+    int16_t dist_rr_forward;
     //CHECKSUM
     uint8_t checksum_out;
 };

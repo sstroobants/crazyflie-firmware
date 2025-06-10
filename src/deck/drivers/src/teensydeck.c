@@ -208,8 +208,8 @@ void teensyInit(DeckInfo* info)
   idPidRatePitchOutput = logGetVarId("pid_rate", "pitch_output");
   idPidRateYawOutput = logGetVarId("pid_rate", "yaw_output");
   
-//   Add delay to ensure the deck is ready before starting
-  vTaskDelay(M2T(1000)); // Delay for 1 seconds (1000 ms)
+//   Add delay to ensure the deck is ready before starting NOT NECESSARY?
+//   vTaskDelay(M2T(1000)); // Delay for 1 seconds (1000 ms)
   xTaskCreate(teensyTask, TEENSY_TASK_NAME, TEENSY_TASK_STACKSIZE, NULL, TEENSY_TASK_PRI, NULL);
   
   DEBUG_PRINT("FINISHED CREATING TASK\n");
@@ -254,7 +254,7 @@ void teensyTask(void* arg)
     uint32_t now_ms = T2M(xTaskGetTickCount());
     if (now_ms - xLastDebugTime > 1000) {
         DEBUG_PRINT("received %i messages in the last second, spent %i ms sending, %i receiving\n", serial_cf_received_packets, sending_outer, receiving_outer);
-        DEBUG_PRINT("Last received message: ll: %i, ml: %i, mr: %i, rr: %i \n", myserial_control_out.dist_ll, myserial_control_out.dist_ml, myserial_control_out.dist_mr, myserial_control_out.dist_rr);
+        DEBUG_PRINT("Last received message: ll: %i, ml: %i, mr: %i, rr: %i \n", myserial_control_out.dist_ll_forward, myserial_control_out.dist_ml_forward, myserial_control_out.dist_mr_forward, myserial_control_out.dist_rr_forward);
         serial_cf_received_packets = 0;
         sending_outer = 0;
         receiving_outer = 0;
@@ -290,6 +290,15 @@ LOG_GROUP_START(teensy)
  * @brief teensy control status
  */
 LOG_ADD(LOG_UINT8, status, &status)
+LOG_ADD(LOG_UINT16, forward_ll, &myserial_control_out.dist_ll_forward)
+LOG_ADD(LOG_UINT16, forward_ml, &myserial_control_out.dist_ml_forward)
+LOG_ADD(LOG_UINT16, forward_mr, &myserial_control_out.dist_mr_forward)
+LOG_ADD(LOG_UINT16, forward_rr, &myserial_control_out.dist_rr_forward)
+LOG_ADD(LOG_UINT16, bottom_ll, &myserial_control_out.dist_ll_bottom)
+LOG_ADD(LOG_UINT16, bottom_ml, &myserial_control_out.dist_ml_bottom)
+LOG_ADD(LOG_UINT16, bottom_mr, &myserial_control_out.dist_mr_bottom)
+LOG_ADD(LOG_UINT16, bottom_rr, &myserial_control_out.dist_rr_bottom)
+
 LOG_GROUP_STOP(teensy)
 
 PARAM_GROUP_START(deck)

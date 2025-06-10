@@ -1,0 +1,1 @@
+obj-y += autonomous_nav.o
