@@ -252,7 +252,7 @@ void teensyTask(void* arg)
     }
     // Printing the amount of received messages over the last seconds
     uint32_t now_ms = T2M(xTaskGetTickCount());
-    if (now_ms - xLastDebugTime > 1000) {
+    if (now_ms - xLastDebugTime > 10000) {
         DEBUG_PRINT("received %i messages in the last second, spent %i ms sending, %i receiving\n", serial_cf_received_packets, sending_outer, receiving_outer);
         DEBUG_PRINT("Last received message: ll: %i, ml: %i, mr: %i, rr: %i \n", myserial_control_out.dist_ll_forward, myserial_control_out.dist_ml_forward, myserial_control_out.dist_mr_forward, myserial_control_out.dist_rr_forward);
         serial_cf_received_packets = 0;
@@ -304,5 +304,6 @@ LOG_GROUP_STOP(teensy)
 PARAM_GROUP_START(deck)
 
 PARAM_ADD_CORE(PARAM_UINT8 | PARAM_RONLY, bcTeensy, &isInit)
+PARAM_ADD_CORE(PARAM_UINT8 | PARAM_RONLY, bcZRanger, &isInit)
 
 PARAM_GROUP_STOP(deck)

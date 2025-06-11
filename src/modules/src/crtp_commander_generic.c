@@ -30,6 +30,7 @@
 #include "crtp_commander.h"
 
 #include "commander.h"
+#include "log.h"
 #include "param.h"
 #include "crtp.h"
 #include "num.h"
@@ -37,6 +38,8 @@
 #include "FreeRTOS.h"
 
 #include "debug.h"
+
+uint16_t aux0, aux1, aux2, aux3;
 
 /* The generic commander format contains a packet type and data that has to be
  * decoded into a setpoint_t structure. The aim is to make it future-proof
@@ -326,6 +329,15 @@ static void cppmEmuDecoder(setpoint_t *setpoint, uint8_t type, const void *data,
   // If aux channel 0 is not in use, default to self-leveling enabled.
   isSelfLevelEnabled = !(values->hdr.numAuxChannels >= 1 && values->channelAux[0] < 1500);
 
+  // Store the aux channel in a logged parameter.
+  if (values->hdr.numAuxChannels >= 4) {
+    aux0 = values->channelAux[0];
+    aux1 = values->channelAux[1];
+    aux2 = values->channelAux[2];
+    aux3 = values->channelAux[3];
+  }
+  // isAutonomousModeEnabled = values->hdr.numAuxChannels >= 1 && values->channelAux[3] < 1500;
+
   // Set the modes
 
   // Position is disabled
@@ -339,7 +351,7 @@ static void cppmEmuDecoder(setpoint_t *setpoint, uint8_t type, const void *data,
   // Roll/Pitch mode is either velocity or abs based on isSelfLevelEnabled
   setpoint->mode.roll = isSelfLevelEnabled ? modeAbs : modeVelocity;
   setpoint->mode.pitch = isSelfLevelEnabled ? modeAbs : modeVelocity;
-
+  
   // Rescale the CPPM values into angles to build the setpoint packet
   if(isSelfLevelEnabled)
   {
@@ -561,6 +573,19 @@ void crtpCommanderGenericDecodeSetpoint(setpoint_t *setpoint, CRTPPacket *pk)
   }
 }
 
+
+
+LOG_GROUP_START(cppm)
+/**
+ * @brief cppm aux channels status
+ */
+LOG_ADD(LOG_UINT16,aux0, &aux0)
+LOG_ADD(LOG_UINT16,aux1, &aux1)
+LOG_ADD(LOG_UINT16,aux2, &aux2)
+LOG_ADD(LOG_UINT16,aux3, &aux3)
+
+LOG_GROUP_STOP(cppm)
+
 /**
  * The CPPM (Combined Pulse Position Modulation) parameters
  * configure the maximum angle/rate output given a maximum stick input
@@ -590,5 +615,4 @@ PARAM_ADD(PARAM_FLOAT | PARAM_PERSISTENT, angRoll, &s_CppmEmuRollMaxAngleDeg)
  * @brief Config of max yaw rate at max stick input [DPS] (default: 400)
  */
 PARAM_ADD(PARAM_FLOAT | PARAM_PERSISTENT, rateYaw, &s_CppmEmuYawMaxRateDps)
-
 PARAM_GROUP_STOP(cppm)
