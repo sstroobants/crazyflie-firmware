@@ -40,6 +40,7 @@
 #include "debug.h"
 
 uint16_t aux0, aux1, aux2, aux3;
+float roll_log, pitch_log, yawrate_log, thrust_log;
 
 /* The generic commander format contains a packet type and data that has to be
  * decoded into a setpoint_t structure. The aim is to make it future-proof
@@ -372,6 +373,11 @@ static void cppmEmuDecoder(setpoint_t *setpoint, uint8_t type, const void *data,
   {
     setpoint->thrust = 0;
   }
+
+  roll_log = setpoint->attitude.roll;
+  pitch_log = setpoint->attitude.pitch;
+  yawrate_log = setpoint->attitudeRate.yaw;
+  thrust_log = setpoint->thrust;
 }
 
 /* altHoldDecoder
@@ -583,6 +589,13 @@ LOG_ADD(LOG_UINT16,aux0, &aux0)
 LOG_ADD(LOG_UINT16,aux1, &aux1)
 LOG_ADD(LOG_UINT16,aux2, &aux2)
 LOG_ADD(LOG_UINT16,aux3, &aux3)
+/**
+ * @brief cppm roll/pitch/yawrate/thrust channels
+ */
+LOG_ADD(LOG_FLOAT,roll, &roll_log)
+LOG_ADD(LOG_FLOAT,pitch, &pitch_log)
+LOG_ADD(LOG_FLOAT,yawrate, &yawrate_log)
+LOG_ADD(LOG_FLOAT,thrust, &thrust_log)
 
 LOG_GROUP_STOP(cppm)
 

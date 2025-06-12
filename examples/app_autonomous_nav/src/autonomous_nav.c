@@ -29,6 +29,7 @@
 #include <string.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <math.h>
 
 #include "app.h"
 
@@ -43,19 +44,26 @@
 #define DEBUG_MODULE "AUTONOMOUS"
 #include "debug.h"
 
+#define HOLD_HEIGHT_SCALE 0.015f
+#define HOLD_HEIGHT_DEADZONE 0.1f
+
 // Log variables
 // sensors
 logVarId_t idForwardLL, idForwardML, idForwardMR, idForwardRR;
 int16_t forwardLL, forwardML, forwardMR, forwardRR;
 logVarId_t idBottomLL, idBottomML, idBottomMR, idBottomRR;
 int16_t bottomLL, bottomML, bottomMR, bottomRR;
-// cppm radio aux channels
-logVarId_t idAux3;
-int16_t autonomous_mode_switch;
-
+// states
+logVarId_t idHeightEstimate;
+float heightEstimate;
+// cppm radio channels
+logVarId_t idAux3, idCppmRoll, idCppmPitch, idCppmYawrate, idCppmThrust;
+float cppmRoll, cppmPitch, cppmYawrate, cppmThrust;
 // mode variables
-
 bool isActive = false;
+bool setAutonomousMode = false;
+bool setManualMode = false;
+float holdHeight = 0.0f;
 
 void getLogIds()
 {
@@ -67,20 +75,30 @@ void getLogIds()
   idBottomML = logGetVarId("teensy", "bottom_ml");
   idBottomMR = logGetVarId("teensy", "bottom_mr");
   idBottomRR = logGetVarId("teensy", "bottom_rr");
+  
   idAux3 = logGetVarId("cppm", "aux3");
+  idCppmRoll = logGetVarId("cppm", "roll");
+  idCppmPitch = logGetVarId("cppm", "pitch");
+  idCppmYawrate = logGetVarId("cppm", "yawrate");
+  idCppmThrust = logGetVarId("cppm", "thrust");
+
+  idHeightEstimate = logGetVarId("stateEstimate", "z");
+
 }
 
-// static void setHeightHoldSetpoint(setpoint_t *setpoint, float roll, float pitch, float z, float yawrate)
-// {
-//   setpoint->mode.z = modeAbs;
-//   setpoint->position.z = z;
-//   setpoint->mode.yaw = modeVelocity;
-//   setpoint->attitudeRate.yaw = yawrate;
-//   setpoint->mode.roll = modeAbs;
-//   setpoint->mode.pitch = modeAbs;
-//   setpoint->attitude.roll = roll;
-//   setpoint->attitude.pitch = pitch;
-// }
+static void setHeightHoldSetpoint(setpoint_t *setpoint, float roll, float pitch, float z, float yawrate)
+{
+  setpoint->mode.x = modeDisable;
+  setpoint->mode.y = modeDisable;
+  setpoint->mode.z = modeAbs;
+  setpoint->position.z = z;
+  setpoint->mode.yaw = modeVelocity;
+  setpoint->attitudeRate.yaw = yawrate;
+  setpoint->mode.roll = modeAbs;
+  setpoint->mode.pitch = modeAbs;
+  setpoint->attitude.roll = roll;
+  setpoint->attitude.pitch = pitch;
+}
 
 void sendHeightMeasurementToEstimator()
 {
@@ -103,30 +121,40 @@ void sendHeightMeasurementToEstimator()
 
 int16_t setActiveStatus()
 {
-  int16_t autonomous_mode_switch = logGetInt(idAux3);
+  int16_t autonomousModeSwitch = logGetInt(idAux3);
   // DEBUG_PRINT("aux 3 is currently: %d", autonomous_mode_switch);
 
   // aux3 = 0       -> transmitter is not connected
   // aux3 = 2000    -> B switch is UP, meaning no autonomous mode
   // aux3 = 1000    -> B switch is DOWN, meaning autonomous mode
-  if (autonomous_mode_switch > 0)
+  if (autonomousModeSwitch > 0)
   {
-    if (autonomous_mode_switch < 1400)
+    if (autonomousModeSwitch < 1400)
     {
       if (!isActive)
       {
         // switching to autonomous mode
-        DEBUG_PRINT("Switching to autonomous mode\n");
+        // DEBUG_PRINT("Switching to autonomous mode\n");
         isActive = true;
+        setAutonomousMode = true;
       }
     }
     else if (isActive)
     {
-      DEBUG_PRINT("Switching back to manual mode\n");
+      // DEBUG_PRINT("Switching back to manual mode\n");
       isActive = false;
+      setManualMode = true;
     }
   }
-  return autonomous_mode_switch;
+  return autonomousModeSwitch;
+}
+
+void getCppmSetpoints()
+{
+  cppmRoll = logGetFloat(idCppmRoll);
+  cppmPitch = logGetFloat(idCppmPitch);
+  cppmYawrate = logGetFloat(idCppmYawrate);
+  cppmThrust = logGetFloat(idCppmThrust);
 }
 
 void appMain()
@@ -144,8 +172,43 @@ void appMain()
     // toggle the activate status based on the aux channel
     setActiveStatus();
 
-    // printAuxStatus();
+    // Get the last setpoint and state.
+    // Currently only used for maintaining altitude when switching?
+    // setpoint_t setpoint;
+    // state_t state;
+    // commanderGetSetpoint(&setpoint, &state);
 
-    // DEBUG_PRINT("Bottom dist = %f\n",(double) bottom_dist);
+    // When we are performing autonomous mode
+    if (isActive)
+    {
+      // If we need to perform switching logic
+      if (setAutonomousMode)
+      {
+        holdHeight = 0.0f;
+        heightEstimate = logGetFloat(idHeightEstimate);
+        DEBUG_PRINT("Altitude at time of switching: %f\n", (double)heightEstimate);
+        holdHeight = heightEstimate;
+        setAutonomousMode = false;
+      }
+
+      setpoint_t setpoint;
+      // state_t state;
+
+      getCppmSetpoints();
+
+      float vz = (cppmThrust - 32767) / 32767.0f;
+      vz = (fabsf(vz) < HOLD_HEIGHT_DEADZONE) ? 0.0f : vz;
+      holdHeight += vz * HOLD_HEIGHT_SCALE;
+      // DEBUG_PRINT("Setpoints: %f, %f, %f, %f\n", (double)cppmRoll, (double)cppmPitch, (double)cppmYawrate, (double)cppmThrust);
+      setHeightHoldSetpoint(&setpoint, cppmRoll, cppmPitch, holdHeight, cppmYawrate);
+      commanderSetSetpoint(&setpoint, 3);
+      DEBUG_PRINT("vz: %f\n", (double) holdHeight);
+      // commanderGetSetpoint(&setpoint, &state);
+      // DEBUG_PRINT("Setpoints: %f, %f, %f, %f\n", (double)setpoint.attitude.roll, (double)setpoint.attitude.pitch, (double)setpoint.attitudeRate.yaw, (double)setpoint.thrust);
+    }
+    else if (setManualMode)
+    {
+      commanderRelaxPriority();
+    }
   }
 }
