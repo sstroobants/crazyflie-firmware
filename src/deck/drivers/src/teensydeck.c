@@ -94,6 +94,9 @@ void setControlInMessage(void)
     accY = logGetFloat(idAccY);
     accZ = logGetFloat(idAccZ);
 
+    stateEstimateRoll = logGetFloat(idStateEstimateRoll);
+    stateEstimatePitch = logGetFloat(idStateEstimatePitch);
+
     controllerRoll = logGetFloat(idControllerRoll);
     controllerPitch = logGetFloat(idControllerPitch);
     controllerYawRate = logGetFloat(idControllerYawRate);
@@ -105,9 +108,11 @@ void setControlInMessage(void)
     myserial_control_in.x_acc = accX;
     myserial_control_in.y_acc = accY;
     myserial_control_in.z_acc = accZ;
-    myserial_control_in.roll = controllerRoll;
-    myserial_control_in.pitch = controllerPitch;
-    myserial_control_in.yaw = controllerYawRate;
+    myserial_control_in.roll = stateEstimateRoll;
+    myserial_control_in.pitch = stateEstimatePitch;
+    myserial_control_in.roll_t = controllerRoll;
+    myserial_control_in.pitch_t = controllerPitch;
+    myserial_control_in.yaw_t = controllerYawRate;
 }
 
 // Read a control out message over uart
@@ -254,7 +259,7 @@ void teensyTask(void* arg)
     uint32_t now_ms = T2M(xTaskGetTickCount());
     if (now_ms - xLastDebugTime > 10000) {
         DEBUG_PRINT("received %i messages in the last second, spent %i ms sending, %i receiving\n", serial_cf_received_packets, sending_outer, receiving_outer);
-        DEBUG_PRINT("Last received message: ll: %i, ml: %i, mr: %i, rr: %i \n", myserial_control_out.dist_ll_forward, myserial_control_out.dist_ml_forward, myserial_control_out.dist_mr_forward, myserial_control_out.dist_rr_forward);
+        // DEBUG_PRINT("Last received message: ll: %i, ml: %i, mr: %i, rr: %i \n", myserial_control_out.dist_ll_forward, myserial_control_out.dist_ml_forward, myserial_control_out.dist_mr_forward, myserial_control_out.dist_rr_forward);
         serial_cf_received_packets = 0;
         sending_outer = 0;
         receiving_outer = 0;

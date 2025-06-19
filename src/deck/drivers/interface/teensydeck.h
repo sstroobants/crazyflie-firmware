@@ -31,10 +31,13 @@
 
 struct __attribute__((__packed__)) serial_control_in {
     float thrust;
-    //state
+    // state
     float roll; //roll target
     float pitch; //pitch target
-    float yaw; //yaw rate target
+    // control targets
+    float roll_t; //roll target
+    float pitch_t; //pitch target
+    float yaw_t; //yaw rate target
     // gyro values
     float roll_gyro;
     float pitch_gyro;
