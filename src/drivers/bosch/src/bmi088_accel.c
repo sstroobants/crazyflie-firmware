@@ -245,7 +245,7 @@ uint16_t bmi088_accel_init(struct bmi088_dev *dev)
             /* Initializing accel sensor parameters with default values */
             dev->accel_cfg.bw = BMI088_ACCEL_ODR_100_HZ;
             dev->accel_cfg.power = BMI088_ACCEL_PM_SUSPEND;
-            dev->accel_cfg.range = BMI088_ACCEL_RANGE_24G;
+            dev->accel_cfg.range = BMI088_ACCEL_RANGE_6G;
 
             /* Copying accel_cfg parameters of device structure to
              * accel_cfg_copy structure to maintain a copy */
@@ -1043,7 +1043,7 @@ static uint16_t set_accel_selftest_config(struct bmi088_dev *dev)
     /* Configuring sensors to perform accel self test */
     dev->accel_cfg.odr = BMI088_ACCEL_ODR_1600_HZ;
     dev->accel_cfg.bw = BMI088_ACCEL_BW_NORMAL;
-    dev->accel_cfg.range = BMI088_ACCEL_RANGE_6G;
+    dev->accel_cfg.range = BMI088_ACCEL_RANGE_24G;
 
     /* Enable Accel sensor */
     rslt = bmi088_accel_switch_control(dev, BMI088_ACCEL_POWER_ENABLE);
