@@ -243,14 +243,22 @@ void appMain()
       holdHeight += vz * HOLD_HEIGHT_SCALE;
       
       // Pitch 6 degrees forward always, unless we are avoiding obstacles
-      pitchOffset = FORWARD_PITCH;
+      //pitchOffset = FORWARD_PITCH;
+
+
+
 
       // Begin BT code
       bb.pathClear = !avoidForwardObstacles();
+      bb.leftDist = forwardLL;
+      bb.rightDist = forwardRR;
       
-      //BTStatus status = ManualTree.execute(&ManualTree, &bb);
+      BTStatus status = ManualTree.execute(&ManualTree, &bb);
+      DEBUG_PRINT("Tree status: %d\n", status);
 
 
+      yawRateOffset = bb.r_cmd * 57.3f; // to degree/s
+      pitchOffset = bb.vx_cmd * (-30.0f); // Map velocity command to pitch command
 
       // End BT code
 

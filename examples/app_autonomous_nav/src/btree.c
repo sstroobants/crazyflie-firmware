@@ -2,6 +2,13 @@
 #include <stdlib.h>
 #include "btree.h"
 
+#define DEBUG_MODULE "BTREE"
+#include "debug.h"
+
+#define TURN_RATE 0.5f
+#define FWD_VEL 0.3f
+
+
 
 // ========= Composite Nodes ===========
 
@@ -51,16 +58,23 @@ BTStatus executeBTSelector(BTNode *node, BTBlackboard *bb)
 
 BTStatus turnRightBT(BTNode *node, BTBlackboard *bb)
 {
+    DEBUG_PRINT("Action Turn Right");
+    bb->r_cmd = TURN_RATE;
     return BT_SUCCESS;
 }
 
 BTStatus turnLeftBT(BTNode *node, BTBlackboard *bb)
 {
+    DEBUG_PRINT("Action Turn Left");
+    bb->r_cmd = -TURN_RATE;
     return BT_SUCCESS;
 }
 
 BTStatus moveForwardBT(BTNode *node, BTBlackboard *bb)
 {
+    DEBUG_PRINT("Action Move Fwd");
+    bb->vx_cmd = FWD_VEL;
+    bb->r_cmd = 0.0f;
     return BT_SUCCESS;
 }
 
@@ -69,6 +83,7 @@ BTStatus moveForwardBT(BTNode *node, BTBlackboard *bb)
 
 BTStatus randomConditionBT(BTNode *node, BTBlackboard *bb)
 {
+    DEBUG_PRINT("Condition Random");
     if (rand() % 2 == 0)
     {
         return BT_SUCCESS;
@@ -81,10 +96,24 @@ BTStatus randomConditionBT(BTNode *node, BTBlackboard *bb)
 
 BTStatus pathClearBT(BTNode *node, BTBlackboard *bb)
 {
+    DEBUG_PRINT("Condition Path clear");
     if (bb->pathClear)
     { 
         return BT_SUCCESS;
     } 
+    else
+    {
+        return BT_FAILURE;
+    }
+}
+
+BTStatus leftOverRightBT(BTNode *node, BTBlackboard *bb)
+{
+    DEBUG_PRINT("Condition Left over right");
+    if (bb->leftDist > bb->rightDist)
+    {
+        return BT_SUCCESS;
+    }
     else
     {
         return BT_FAILURE;

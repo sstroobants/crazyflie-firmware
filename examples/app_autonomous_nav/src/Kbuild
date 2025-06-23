@@ -1,1 +1,2 @@
 obj-y += autonomous_nav.o
+obj-y += btree.o

@@ -19,6 +19,11 @@ typedef enum {
 
 typedef struct {
     bool pathClear;
+    float vx_cmd;
+    float vz_cmd;
+    float r_cmd;
+    float leftDist;
+    float rightDist;
 } BTBlackboard;
 
 struct BTNode;
