@@ -194,25 +194,25 @@
 
 
 
-// Autonomous navigation defaults
+// // Autonomous navigation defaults
 #ifndef AUTNAV_AVOID_DURATION
-    #define AUTNAV_AVOID_DURATION 800 // ms
+    #define AUTNAV_AVOID_DURATION 800
 #endif
 #ifndef AUTNAV_AVOID_YAWRATE
-    #define AUTNAV_AVOID_YAWRATE 60.0f // degrees/sec
+    #define AUTNAV_AVOID_YAWRATE 60.0f
 #endif
 #ifndef AUTNAV_HOLD_HEIGHT_SCALE
-    #define AUTNAV_HOLD_HEIGHT_SCALE 0.015f // meters per second per 10000 units of thrust
+    #define AUTNAV_HOLD_HEIGHT_SCALE 0.015f
 #endif
 #ifndef AUTNAV_HOLD_HEIGHT_DEADZONE
-    #define AUTNAV_HOLD_HEIGHT_DEADZONE 0.15f // meters
+    #define AUTNAV_HOLD_HEIGHT_DEADZONE 0.15f
 #endif
 #ifndef AUTNAV_OBSTACLE_MINIMUM_DISTANCE
-    #define AUTNAV_OBSTACLE_MINIMUM_DISTANCE 1.0f // meters
+    #define AUTNAV_OBSTACLE_MINIMUM_DISTANCE 1.0f
 #endif  
 #ifndef AUTNAV_AVOID_PITCH
-    #define AUTNAV_AVOID_PITCH 1.0f // degrees
+    #define AUTNAV_AVOID_PITCH 1.0f
 #endif
 #ifndef AUTNAV_FORWARD_PITCH
-    #define AUTNAV_FORWARD_PITCH -15.0f // degrees
+    #define AUTNAV_FORWARD_PITCH -15.0f
 #endif
