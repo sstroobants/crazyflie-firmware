@@ -40,17 +40,18 @@
 #include "param.h"
 #include "log.h"
 #include "range.h"
+#include "platform_defaults.h"
 
 #define DEBUG_MODULE "AUTONOMOUS"
 #include "debug.h"
 
-#define HOLD_HEIGHT_SCALE 0.015f
-#define HOLD_HEIGHT_DEADZONE 0.15f
-#define OBSTACLE_MINIMUM_DISTANCE 0.7f // meters
-#define AVOID_DURATION 800 // milliseconds
-#define AVOID_PITCH 1.0f
-#define FORWARD_PITCH -15.0f  
-#define AVOID_YAWRATE 60.0f
+// #define HOLD_HEIGHT_SCALE 0.015f
+// #define HOLD_HEIGHT_DEADZONE 0.15f
+// #define OBSTACLE_MINIMUM_DISTANCE 1.0f // meters
+// #define AVOID_DURATION 800 // milliseconds
+// #define AVOID_PITCH 1.0f
+// #define FORWARD_PITCH -15.0f  
+// #define AVOID_YAWRATE 60.0f
 
 // Log variables
 // sensors
@@ -74,6 +75,14 @@ float holdHeight = 0.0f;
 uint32_t startAvoidingTime;
 float yawRateOffset = 0.0f;
 float pitchOffset = 0.0f;
+
+float forwardPitch = AUTNAV_FORWARD_PITCH; // pitch offset to apply when avoiding obstacles
+float avoidPitch = AUTNAV_AVOID_PITCH;
+float obstacleMinimumDistance = AUTNAV_OBSTACLE_MINIMUM_DISTANCE; // minimum distance to an obstacle to trigger avoidance
+float avoidYawrate = AUTNAV_AVOID_YAWRATE; // yaw rate to apply when avoiding obstacles
+uint32_t avoidDuration = AUTNAV_AVOID_DURATION; // duration of the avoidance maneuver in milliseconds
+float holdHeightScale = AUTNAV_HOLD_HEIGHT_SCALE; // scale for the height hold setpoint based on thrust
+float holdHeightDeadzone = AUTNAV_HOLD_HEIGHT_DEADZONE; // deadzone for the height hold setpoint
 
 
 void getLogIds()
@@ -123,9 +132,10 @@ void sendHeightMeasurementToEstimator()
   bottom_dist /= 1000;
 
   rangeSet(rangeDown, bottom_dist);
+  
   // IMPORTANT: currently no filtering of bottom sensor is performed
-  // (except for averaging over all 16 readings) this means that
-  // it assumes a flat ground plane, and the estimator has a move
+  // (except for averaging over all readings) this means that
+  // it assumes a flat ground plane
   rangeEnqueueDownRangeInEstimator(bottom_dist, 0, xTaskGetTickCount());
 }
 
@@ -179,7 +189,7 @@ bool avoidForwardObstacles()
   forwardMR = forward_mr > 0 ? (float) forward_mr / 1000.0f: 4.0f;
   forwardRR = forward_rr > 0 ? (float) forward_rr / 1000.0f: 4.0f;
   
-  if (forwardML < OBSTACLE_MINIMUM_DISTANCE || forwardMR < OBSTACLE_MINIMUM_DISTANCE)
+  if (forwardML < obstacleMinimumDistance || forwardMR < obstacleMinimumDistance)
   {
     // If any of the forward sensors is below certain distance, we need to stop
     return true;
@@ -234,11 +244,11 @@ void appMain()
       getCppmSetpoints();
 
       float vz = (cppmThrust - 32767) / 32767.0f;
-      vz = (fabsf(vz) < HOLD_HEIGHT_DEADZONE) ? 0.0f : vz;
-      holdHeight += vz * HOLD_HEIGHT_SCALE;
+      vz = (fabsf(vz) < holdHeightDeadzone) ? 0.0f : vz;
+      holdHeight += vz * holdHeightScale;
       
       // Pitch 6 degrees forward always, unless we are avoiding obstacles
-      pitchOffset = FORWARD_PITCH;
+      pitchOffset = forwardPitch;
 
       bool startAvoiding = avoidForwardObstacles();
 
@@ -247,21 +257,15 @@ void appMain()
         avoiding = true;
         startAvoidingTime = T2M(xTaskGetTickCount());
         DEBUG_PRINT("Obstacle detected, stopping!\n");
-        if (forwardLL > forwardRR) {
-          // If left side is more free, yaw left
-          yawRateOffset = AVOID_YAWRATE; // rotate to the left
-        } else {
-          // If right side is more free, yaw right
-          yawRateOffset = -AVOID_YAWRATE; // rotate to the right
-        }
+        yawRateOffset = (forwardLL > forwardRR) ? avoidYawrate : -avoidYawrate;
       }
 
       if (avoiding)
       {
         // If we are avoiding obstacles, we pitch back a bit and yaw towards "most free" side
-        pitchOffset = AVOID_PITCH;
+        pitchOffset = avoidPitch;
         uint32_t currentAvoidingTime = T2M(xTaskGetTickCount());
-        if (currentAvoidingTime - startAvoidingTime > AVOID_DURATION) {
+        if (currentAvoidingTime - startAvoidingTime > avoidDuration) {
           avoiding = false;
           yawRateOffset = 0.0f; // Reset yaw rate offset
           DEBUG_PRINT("Avoiding finished, resuming normal flight\n");
@@ -275,7 +279,7 @@ void appMain()
 
       setHeightHoldSetpoint(&setpoint, cppmRoll, cppmPitch, holdHeight, cppmYawrate);
       commanderSetSetpoint(&setpoint, 3);
-      // DEBUG_PRINT("vz: %f\n", (double) holdHeight);
+      DEBUG_PRINT("vz: %f\n", (double) holdHeight);
       // commanderGetSetpoint(&setpoint, &state);
       // DEBUG_PRINT("Setpoints: %f, %f, %f, %f\n", (double)setpoint.attitude.roll, (double)setpoint.attitude.pitch, (double)setpoint.attitudeRate.yaw, (double)setpoint.thrust);
     }
@@ -286,3 +290,36 @@ void appMain()
     }
   }
 }
+
+
+PARAM_GROUP_START(auto_nav)
+
+/**
+ * @brief Pitch offset to apply when moving forward
+ */
+PARAM_ADD(PARAM_FLOAT | PARAM_PERSISTENT, forwardPitch, &forwardPitch)
+/**
+ * @brief Pitch offset to apply when avoiding obstacles
+ */
+PARAM_ADD(PARAM_FLOAT | PARAM_PERSISTENT, avoidPitch, &avoidPitch)
+/**
+ * @brief Duration of avoidance maneuver in milliseconds
+ */
+PARAM_ADD(PARAM_UINT32 | PARAM_PERSISTENT, avoidDuration, &avoidDuration)
+/**
+ * @brief Minimum distance to obstacle to trigger avoidance (meters)
+ */
+PARAM_ADD(PARAM_FLOAT | PARAM_PERSISTENT, obstMinDistance, &obstacleMinimumDistance)
+/**
+ * @brief Yaw rate to apply when avoiding obstacles (deg/s)
+ */
+PARAM_ADD(PARAM_FLOAT | PARAM_PERSISTENT, avoidYawrate, &avoidYawrate)
+/**
+ * @brief Scale for height hold setpoint based on thrust
+ */
+PARAM_ADD(PARAM_FLOAT | PARAM_PERSISTENT, holdHghtScale, &holdHeightScale)
+/**
+ * @brief Deadzone for height hold setpoint
+ */
+PARAM_ADD(PARAM_FLOAT | PARAM_PERSISTENT, holdHghtDeadzone, &holdHeightDeadzone)
+PARAM_GROUP_STOP(auto_nav)

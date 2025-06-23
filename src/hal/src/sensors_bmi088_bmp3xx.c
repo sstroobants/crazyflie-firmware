@@ -338,6 +338,7 @@ static void sensorsTask(void *param)
 
       measurement.type = MeasurementTypeAcceleration;
       measurement.data.acceleration.acc = sensorData.acc;
+      // DEBUG_PRINT("Acc: %.2f %.2f %.2f\n", (double)sensorData.acc.x, (double)sensorData.acc.y, (double)sensorData.acc.z);
       estimatorEnqueue(&measurement);
     }
 

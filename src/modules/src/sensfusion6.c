@@ -32,6 +32,10 @@
 
 #include "autoconf.h"
 
+#include "debug.h"
+
+#define DEBUG_MODULE "SENSFUSION6"
+
 #ifdef CONFIG_IMU_MADGWICK_QUATERNION
   #define BETA_DEF     0.01f    // 2 * proportional gain
 #else // MAHONY_QUATERNION_IMU
@@ -91,7 +95,10 @@ void sensfusion6UpdateQ(float gx, float gy, float gz, float ax, float ay, float 
   estimatedGravityDirection(&gravX, &gravY, &gravZ);
 
   if (!isCalibrated) {
+    DEBUG_PRINT("sensfusion6: calibrating baseZacc\n");
+    DEBUG_PRINT("ax: %f, ay: %f, az: %f\n", (double)ax, (double)ay, (double)az);
     baseZacc = sensfusion6GetAccZ(ax, ay, az);
+    DEBUG_PRINT("sensfusion6: baseZacc set to %f\n", (double)baseZacc);
     isCalibrated = true;
   }
 }
