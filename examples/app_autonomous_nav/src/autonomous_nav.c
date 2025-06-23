@@ -58,7 +58,7 @@
 logVarId_t idForwardLL, idForwardML, idForwardMR, idForwardRR;
 float forwardLL, forwardML, forwardMR, forwardRR;
 logVarId_t idBottomLL, idBottomML, idBottomMR, idBottomRR;
-// int16_t bottomLL, bottomML, bottomMR, bottomRR;
+logVarId_t idTeensyStatus;
 // states
 logVarId_t idHeightEstimate;
 float heightEstimate;
@@ -95,6 +95,7 @@ void getLogIds()
   idBottomML = logGetVarId("teensy", "bottom_ml");
   idBottomMR = logGetVarId("teensy", "bottom_mr");
   idBottomRR = logGetVarId("teensy", "bottom_rr");
+  idTeensyStatus = logGetVarId("teensy", "status");
   
   idAux3 = logGetVarId("cppm", "aux3");
   idCppmRoll = logGetVarId("cppm", "roll");
@@ -228,6 +229,12 @@ void appMain()
     // When we are performing autonomous mode
     if (isActive)
     {
+      if (!logGetUint(idTeensyStatus)){
+        DEBUG_PRINT("Teensy is not responding, stopping autonomous mode\n");
+        isActive = false;
+        setManualMode = true;
+        continue; // Skip the rest of the loop if Teensy is not responding
+      }
       // If we need to perform switching logic
       if (setAutonomousMode)
       {
