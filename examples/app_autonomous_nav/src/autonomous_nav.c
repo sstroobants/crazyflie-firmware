@@ -248,7 +248,7 @@ void appMain()
 
 
 
-      // Begin BT code
+      // // Begin BT code
       bb.pathClear = !avoidForwardObstacles();
       bb.leftDist = forwardLL;
       bb.rightDist = forwardRR;

@@ -58,21 +58,21 @@ BTStatus executeBTSelector(BTNode *node, BTBlackboard *bb)
 
 BTStatus turnRightBT(BTNode *node, BTBlackboard *bb)
 {
-    DEBUG_PRINT("Action Turn Right");
+    DEBUG_PRINT("Action Turn Right\n");
     bb->r_cmd = TURN_RATE;
     return BT_SUCCESS;
 }
 
 BTStatus turnLeftBT(BTNode *node, BTBlackboard *bb)
 {
-    DEBUG_PRINT("Action Turn Left");
+    DEBUG_PRINT("Action Turn Left\n");
     bb->r_cmd = -TURN_RATE;
     return BT_SUCCESS;
 }
 
 BTStatus moveForwardBT(BTNode *node, BTBlackboard *bb)
 {
-    DEBUG_PRINT("Action Move Fwd");
+    DEBUG_PRINT("Action Move Fwd\n");
     bb->vx_cmd = FWD_VEL;
     bb->r_cmd = 0.0f;
     return BT_SUCCESS;
@@ -83,7 +83,7 @@ BTStatus moveForwardBT(BTNode *node, BTBlackboard *bb)
 
 BTStatus randomConditionBT(BTNode *node, BTBlackboard *bb)
 {
-    DEBUG_PRINT("Condition Random");
+    DEBUG_PRINT("Condition Random\n");
     if (rand() % 2 == 0)
     {
         return BT_SUCCESS;
@@ -96,20 +96,21 @@ BTStatus randomConditionBT(BTNode *node, BTBlackboard *bb)
 
 BTStatus pathClearBT(BTNode *node, BTBlackboard *bb)
 {
-    DEBUG_PRINT("Condition Path clear");
     if (bb->pathClear)
     { 
         return BT_SUCCESS;
     } 
     else
     {
+        DEBUG_PRINT("Path obstructed \n");
+
         return BT_FAILURE;
     }
 }
 
 BTStatus leftOverRightBT(BTNode *node, BTBlackboard *bb)
 {
-    DEBUG_PRINT("Condition Left over right");
+    DEBUG_PRINT("Condition Left over right\n");
     if (bb->leftDist > bb->rightDist)
     {
         return BT_SUCCESS;
@@ -131,6 +132,7 @@ BTStatus leftOverRightBT(BTNode *node, BTBlackboard *bb)
 
 // Manually designed tree
 static BTNode lr_random_node = {.type = BT_LEAF, .execute = randomConditionBT};
+
 static BTNode pathclear_node = {.type = BT_LEAF, .execute = pathClearBT};
 static BTNode turnleft_node = {.type = BT_LEAF, .execute = turnLeftBT};
 static BTNode turnright_node = {.type = BT_LEAF, .execute = turnRightBT};
@@ -181,5 +183,16 @@ BTNode ManualTree = {
         .current_child = 0
     }
 };
+
+// static BTNode *ManualTree_children[] = {&lr_random_node, &moveforward_node};
+// BTNode ManualTree = {
+//     .type = BT_SEQUENCE,
+//     .execute = executeBTSequence,
+//     .composite = {
+//         .children = ManualTree_children,
+//         .child_count = 2,
+//         .current_child = 0
+//     }
+// };
 
 // End manually designed tree
