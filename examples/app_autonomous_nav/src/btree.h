@@ -37,7 +37,6 @@ typedef struct BTNode {
 BTStatus executeBTSequence(BTNode *node, void *context);
 BTStatus executeBTSelector(BTNode *node, void *context);
 
-// List of leaf nodes
-BTStatus turnRightBT(BTNode *node, void *context);
-
+// Expose pre-defined BTs
+extern BTNode ManualTree;
 #endif

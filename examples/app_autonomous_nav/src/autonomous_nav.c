@@ -242,36 +242,42 @@ void appMain()
       // Pitch 6 degrees forward always, unless we are avoiding obstacles
       pitchOffset = FORWARD_PITCH;
 
-      bool startAvoiding = avoidForwardObstacles();
-
-      // Decision: turn left or right
-      if (!avoiding && startAvoiding)
-      {
-        avoiding = true;
-        startAvoidingTime = T2M(xTaskGetTickCount());
-        DEBUG_PRINT("Obstacle detected, stopping!\n");
-        if (forwardLL > forwardRR) {
-          // If left side is more free, yaw left
-          yawRateOffset = AVOID_YAWRATE; // rotate to the left
-        } else {
-          // If right side is more free, yaw right
-          yawRateOffset = -AVOID_YAWRATE; // rotate to the right
-        }
-      }
+      // Begin BT code
+     
 
 
-      // Turning for AVOID_DURATION milliseconds
-      if (avoiding)
-      {
-        // If we are avoiding obstacles, we pitch back a bit and yaw towards "most free" side
-        pitchOffset = AVOID_PITCH;
-        uint32_t currentAvoidingTime = T2M(xTaskGetTickCount());
-        if (currentAvoidingTime - startAvoidingTime > AVOID_DURATION) {
-          avoiding = false;
-          yawRateOffset = 0.0f; // Reset yaw rate offset
-          DEBUG_PRINT("Avoiding finished, resuming normal flight\n");
-        }
-      }
+      // End BT code
+
+      //bool startAvoiding = avoidForwardObstacles();
+
+      // // Decision: turn left or right
+      // if (!avoiding && startAvoiding)
+      // {
+      //   avoiding = true;
+      //   startAvoidingTime = T2M(xTaskGetTickCount());
+      //   DEBUG_PRINT("Obstacle detected, stopping!\n");
+      //   if (forwardLL > forwardRR) {
+      //     // If left side is more free, yaw left
+      //     yawRateOffset = AVOID_YAWRATE; // rotate to the left
+      //   } else {
+      //     // If right side is more free, yaw right
+      //     yawRateOffset = -AVOID_YAWRATE; // rotate to the right
+      //   }
+      // }
+
+
+      // // Turning for AVOID_DURATION milliseconds
+      // if (avoiding)
+      // {
+      //   // If we are avoiding obstacles, we pitch back a bit and yaw towards "most free" side
+      //   pitchOffset = AVOID_PITCH;
+      //   uint32_t currentAvoidingTime = T2M(xTaskGetTickCount());
+      //   if (currentAvoidingTime - startAvoidingTime > AVOID_DURATION) {
+      //     avoiding = false;
+      //     yawRateOffset = 0.0f; // Reset yaw rate offset
+      //     DEBUG_PRINT("Avoiding finished, resuming normal flight\n");
+      //   }
+      // }
 
       // Add to the manual control setpoints
       cppmPitch += pitchOffset;
