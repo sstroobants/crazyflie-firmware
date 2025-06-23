@@ -242,6 +242,7 @@ void appMain()
 
       bool startAvoiding = avoidForwardObstacles();
 
+      // Decision: turn left or right
       if (!avoiding && startAvoiding)
       {
         avoiding = true;
@@ -256,6 +257,8 @@ void appMain()
         }
       }
 
+
+      // Turning for AVOID_DURATION milliseconds
       if (avoiding)
       {
         // If we are avoiding obstacles, we pitch back a bit and yaw towards "most free" side
@@ -268,11 +271,13 @@ void appMain()
         }
       }
 
+      // Add to the manual control setpoints
       cppmPitch += pitchOffset;
       cppmYawrate += yawRateOffset;
 
       // DEBUG_PRINT("cppmRoll: %f, cppmPitch: %f, holdHeight: %f, cppmYawrate: %f\n", (double)cppmRoll, (double)cppmPitch, (double)holdHeight, (double)cppmYawrate);
-
+     
+      // Apply setpoints and altitude hold
       setHeightHoldSetpoint(&setpoint, cppmRoll, cppmPitch, holdHeight, cppmYawrate);
       commanderSetSetpoint(&setpoint, 3);
       // DEBUG_PRINT("vz: %f\n", (double) holdHeight);
