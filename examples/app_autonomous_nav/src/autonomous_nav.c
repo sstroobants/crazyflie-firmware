@@ -41,6 +41,8 @@
 #include "log.h"
 #include "range.h"
 
+#include "btree.h"
+
 #define DEBUG_MODULE "AUTONOMOUS"
 #include "debug.h"
 
