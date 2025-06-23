@@ -1,14 +1,15 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include "btree.h"
 
 
 // ========= Composite Nodes ===========
 
-BTStatus executeBTSequence(BTNode *node, void *context)
+BTStatus executeBTSequence(BTNode *node, BTBlackboard *bb)
 {
     while (node->composite.current_child < node->composite.child_count) {
             BTNode *child = node->composite.children[node->composite.current_child];
-            BTStatus status = child->execute(child, context);
+            BTStatus status = child->execute(child, bb);
             if (status == BT_RUNNING) {
                 return BT_RUNNING;
             }
@@ -23,11 +24,11 @@ BTStatus executeBTSequence(BTNode *node, void *context)
 }
 
 
-BTStatus executeBTSelector(BTNode *node, void *context)
+BTStatus executeBTSelector(BTNode *node, BTBlackboard *bb)
 {
     while (node->composite.current_child < node->composite.child_count) {
             BTNode *child = node->composite.children[node->composite.current_child];
-            BTStatus status = child->execute(child, context);
+            BTStatus status = child->execute(child, bb);
             if (status == BT_RUNNING) {
                 return BT_RUNNING;
             }
@@ -48,17 +49,17 @@ BTStatus executeBTSelector(BTNode *node, void *context)
 
 // Actions
 
-BTStatus turnRightBT(BTNode *node, void *context)
+BTStatus turnRightBT(BTNode *node, BTBlackboard *bb)
 {
     return BT_SUCCESS;
 }
 
-BTStatus turnLeftBT(BTNode *node, void *context)
+BTStatus turnLeftBT(BTNode *node, BTBlackboard *bb)
 {
     return BT_SUCCESS;
 }
 
-BTStatus moveForwardBT(BTNode *node, void *context)
+BTStatus moveForwardBT(BTNode *node, BTBlackboard *bb)
 {
     return BT_SUCCESS;
 }
@@ -66,14 +67,28 @@ BTStatus moveForwardBT(BTNode *node, void *context)
 
 // Conditions
 
-BTStatus randomConditionBT(BTNode *node, void *context)
+BTStatus randomConditionBT(BTNode *node, BTBlackboard *bb)
 {
-    return BT_SUCCESS;
+    if (rand() % 2 == 0)
+    {
+        return BT_SUCCESS;
+    } 
+    else
+    {
+        return BT_FAILURE;
+    }
 }
 
-BTStatus pathClearBT(BTNode *node, void *context)
+BTStatus pathClearBT(BTNode *node, BTBlackboard *bb)
 {
-    return BT_SUCCESS;
+    if (bb->pathClear)
+    { 
+        return BT_SUCCESS;
+    } 
+    else
+    {
+        return BT_FAILURE;
+    }
 }
 
 

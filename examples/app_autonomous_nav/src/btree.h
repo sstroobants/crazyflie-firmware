@@ -1,6 +1,8 @@
 #ifndef BTREE_H
 #define BTREE_H
 
+#include <stdbool.h>
+
 // Return types
 typedef enum {
     BT_SUCCESS,
@@ -15,10 +17,14 @@ typedef enum {
     BT_LEAF
 } BTNodeType;
 
+typedef struct {
+    bool pathClear;
+} BTBlackboard;
+
 struct BTNode;
 
 // Node function type definition that returns a BT_STATUS from above enum
-typedef BTStatus (*BTNodeFunc) (struct BTNode *node, void *context);
+typedef BTStatus (*BTNodeFunc) (struct BTNode *node, BTBlackboard *bb);
 
 typedef struct BTNode {
     BTNodeType type;
@@ -33,9 +39,8 @@ typedef struct BTNode {
     };
 } BTNode;
 
-
-BTStatus executeBTSequence(BTNode *node, void *context);
-BTStatus executeBTSelector(BTNode *node, void *context);
+BTStatus executeBTSequence(BTNode *node, BTBlackboard *bb);
+BTStatus executeBTSelector(BTNode *node, BTBlackboard *bb);
 
 // Expose pre-defined BTs
 extern BTNode ManualTree;

@@ -77,6 +77,9 @@ uint32_t startAvoidingTime;
 float yawRateOffset = 0.0f;
 float pitchOffset = 0.0f;
 
+// Behaviour Tree
+BTBlackboard bb;
+
 
 void getLogIds()
 {
@@ -243,7 +246,10 @@ void appMain()
       pitchOffset = FORWARD_PITCH;
 
       // Begin BT code
-     
+      bb.pathClear = !avoidForwardObstacles();
+      
+      //BTStatus status = ManualTree.execute(&ManualTree, &bb);
+
 
 
       // End BT code
