@@ -309,6 +309,6 @@ LOG_GROUP_STOP(teensy)
 PARAM_GROUP_START(deck)
 
 PARAM_ADD_CORE(PARAM_UINT8 | PARAM_RONLY, bcTeensy, &isInit)
-PARAM_ADD_CORE(PARAM_UINT8 | PARAM_RONLY, bcZRanger, &isInit)
+PARAM_ADD_CORE(PARAM_UINT8 | PARAM_RONLY, bcZRanger, &isInit) // hack so we can use the range messages in the complementary filter
 
 PARAM_GROUP_STOP(deck)

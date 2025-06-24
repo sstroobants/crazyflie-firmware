@@ -245,7 +245,7 @@ uint16_t bmi088_accel_init(struct bmi088_dev *dev)
             /* Initializing accel sensor parameters with default values */
             dev->accel_cfg.bw = BMI088_ACCEL_ODR_100_HZ;
             dev->accel_cfg.power = BMI088_ACCEL_PM_SUSPEND;
-            dev->accel_cfg.range = BMI088_ACCEL_RANGE_24G;
+            dev->accel_cfg.range = BMI088_ACCEL_RANGE_6G;
 
             /* Copying accel_cfg parameters of device structure to
              * accel_cfg_copy structure to maintain a copy */
