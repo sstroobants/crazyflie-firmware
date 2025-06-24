@@ -66,6 +66,9 @@ float heightEstimate;
 logVarId_t idAux3, idCppmRoll, idCppmPitch, idCppmYawrate, idCppmThrust;
 float cppmRoll, cppmPitch, cppmYawrate, cppmThrust;
 
+// height variables
+int16_t bottom_ll_prev = 0;
+
 // mode variables
 bool isActive = false;
 bool setAutonomousMode = false;
@@ -128,16 +131,20 @@ void sendHeightMeasurementToEstimator()
   int16_t bottom_mr = logGetInt(idBottomMR);
   int16_t bottom_rr = logGetInt(idBottomRR);
 
-  float bottom_dist = ((float)bottom_ll + (float)bottom_ml + (float)bottom_mr + (float)bottom_rr) / 4;
-  bottom_dist = (bottom_dist > 80) ? bottom_dist : 0;
-  bottom_dist /= 1000;
-
-  rangeSet(rangeDown, bottom_dist);
+  if (bottom_ll_prev != bottom_ll)
+  {
+    float bottom_dist = ((float)bottom_ll + (float)bottom_ml + (float)bottom_mr + (float)bottom_rr) / 4;
+    bottom_dist = (bottom_dist > 80) ? bottom_dist : 0;
+    bottom_dist /= 1000;
   
-  // IMPORTANT: currently no filtering of bottom sensor is performed
-  // (except for averaging over all readings) this means that
-  // it assumes a flat ground plane
-  rangeEnqueueDownRangeInEstimator(bottom_dist, 0, xTaskGetTickCount());
+    rangeSet(rangeDown, bottom_dist);
+    
+    // IMPORTANT: currently no filtering of bottom sensor is performed
+    // (except for averaging over all readings) this means that
+    // it assumes a flat ground plane
+    rangeEnqueueDownRangeInEstimator(bottom_dist, 0, xTaskGetTickCount());
+  }
+  bottom_ll_prev = bottom_ll;
 }
 
 int16_t setActiveStatus()
