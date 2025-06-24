@@ -214,7 +214,7 @@ void appMain()
   while (1)
   {
     // Currently running the app at 50Hz
-    vTaskDelay(F2T(50));
+    vTaskDelay(F2T(20));
 
     // // Get the forward distances and print them
     // avoidForwardObstacles();
@@ -274,7 +274,7 @@ void appMain()
       DEBUG_PRINT("Tree status: %d\n", status);
 
 
-      yawRateOffset = bb.r_cmd * 57.3f; // to degree/s
+      yawRateOffset = bb.r_cmd * 57.3f * 2; // to degree/s
       pitchOffset = bb.vx_cmd * (-30.0f); // Map velocity command to pitch command
 
       // End BT code
