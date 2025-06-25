@@ -163,15 +163,18 @@ static void buildAnchorMemList(const uint32_t memAddr, const uint8_t readLen, ui
 
 static void txCallback(dwDevice_t *dev)
 {
+  DEBUG_PRINT("locodeck tx callback\n");
   timeout = algorithm->onEvent(dev, eventPacketSent);
 }
 
 static void rxCallback(dwDevice_t *dev)
 {
+  DEBUG_PRINT("locodeck rx callback\n");
   timeout = algorithm->onEvent(dev, eventPacketReceived);
 }
 
 static void rxTimeoutCallback(dwDevice_t * dev) {
+  DEBUG_PRINT("locodeck rx timeout callback\n");
   timeout = algorithm->onEvent(dev, eventReceiveTimeout);
 }
 
@@ -282,7 +285,6 @@ static bool switchToMode(const lpsMode_t newMode) {
 
     algorithm->init(dwm);
     timeout = algorithm->onEvent(dwm, eventTimeout);
-
     result = true;
   }
 
@@ -351,6 +353,8 @@ static void uwbTask(void* parameters) {
 
   systemWaitStart();
 
+  DEBUG_PRINT("UWB task started\n");
+
   while(1) {
     xSemaphoreTake(algoSemaphore, portMAX_DELAY);
     handleModeSwitch();
@@ -362,6 +366,7 @@ static void uwbTask(void* parameters) {
         dwHandleInterrupt(dwm);
         xSemaphoreGive(algoSemaphore);
       } while(digitalRead(GPIO_PIN_IRQ) != 0);
+
     } else {
       xSemaphoreTake(algoSemaphore, portMAX_DELAY);
       timeout = algorithm->onEvent(dwm, eventTimeout);
@@ -424,7 +429,7 @@ static void spiRead(dwDevice_t* dev, const void *header, size_t headerLength,
   STATS_CNT_RATE_EVENT(&spiReadCount);
 }
 
-#if LOCODECK_USE_ALT_PINS
+#if CONFIG_DECK_LOCODECK_USE_ALT_PINS
   void __attribute__((used)) EXTI5_Callback(void)
 #else
   void __attribute__((used)) EXTI11_Callback(void)
@@ -510,7 +515,6 @@ static void dwm1000Init(DeckInfo *info)
   dwAttachSentHandler(dwm, txCallback);
   dwAttachReceivedHandler(dwm, rxCallback);
   dwAttachReceiveTimeoutHandler(dwm, rxTimeoutCallback);
-
   dwNewConfiguration(dwm);
   dwSetDefaults(dwm);
 
@@ -543,6 +547,7 @@ static void dwm1000Init(DeckInfo *info)
                     LPS_DECK_TASK_PRI, &uwbTaskHandle);
 
   isInit = true;
+  DEBUG_PRINT("dwn1000 init.");
 }
 
 uint16_t locoDeckGetRangingState() {
@@ -568,7 +573,7 @@ static const DeckDriver dwm1000_deck = {
   .pid = 0x06,
   .name = "bcDWM1000",
 
-#ifdef LOCODEC_USE_ALT_PINS
+#ifdef CONFIG_DECK_LOCODECK_USE_ALT_PINS
   .usedGpio = DECK_USING_IO_1 | DECK_USING_IO_2 | DECK_USING_IO_3,
 #else
    // (PC10/PC11 is UART1 TX/RX)

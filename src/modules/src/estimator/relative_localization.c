@@ -151,10 +151,12 @@ void relativeLocoTask(void *arg)
   static uint32_t tick;
   while (1)
   {
-    vTaskDelay(250);
+    vTaskDelay(1);
     tick = xTaskGetTickCount();
+    //DEBUG_PRINT("Relative EKF tick request\n");
     if (RATE_DO_EXECUTE(RELATIVE_LOCALIZATION_RATE, tick))
     {
+      // DEBUG_PRINT("Relative EKF tick\n");
       for (int n = 0; n < NumUWB; n++)
       {
         if (twrGetSwarmInfo(n, &dij, &vxj, &vyj, &vzj, &rj, &hj))

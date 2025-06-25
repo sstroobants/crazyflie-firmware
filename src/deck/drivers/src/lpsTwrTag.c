@@ -80,6 +80,7 @@ static uint16_t median_filter_3(uint16_t *data)
 
 static void txcallback(dwDevice_t *dev)
 {
+  DEBUG_PRINT("txcallback\n");
   dwTime_t departure;
   dwGetTransmitTimestamp(dev, &departure);
   departure.full += (antennaDelay / 2);
@@ -131,6 +132,8 @@ static void txcallback(dwDevice_t *dev)
 
 static void rxcallback(dwDevice_t *dev)
 {
+  DEBUG_PRINT("Rxcallback\n");
+
   dwTime_t arival = {.full = 0};
   int dataLength = dwGetDataLength(dev);
   if (dataLength == 0)
@@ -354,6 +357,7 @@ static void rxcallback(dwDevice_t *dev)
 
 static uint32_t twrTagOnEvent(dwDevice_t *dev, uwbEvent_t event)
 {
+  DEBUG_PRINT("twrTagOnEvent called\n");
   switch (event)
   {
   case eventPacketReceived:
@@ -496,6 +500,7 @@ static uint8_t getActiveAnchorIdList(uint8_t unorderedAnchorList[], const int ma
 
 bool twrGetSwarmInfo(int robNum, uint16_t *range, float *vx, float *vy, float *vz, float *gyroZ, float *height)
 {
+  // DEBUG_PRINT("twrGetSwarmInfo called for robot %d\n", robNum);
   if (state.refresh[robNum] == true)
   {
     state.refresh[robNum] = false;
