@@ -216,3 +216,30 @@
 #ifndef AUTNAV_FORWARD_PITCH
     #define AUTNAV_FORWARD_PITCH -15.0f
 #endif
+
+
+// Peer localisation initials
+#ifndef PEER_LOC_INIT_X1
+    #define PEER_LOC_INIT_X1 0.0f
+#endif
+#ifndef PEER_LOC_INIT_Y1
+    #define PEER_LOC_INIT_Y1 0.0f
+#endif
+#ifndef PEER_LOC_INIT_Z1
+    #define PEER_LOC_INIT_Z1 0.0f
+#endif
+#ifndef PEER_LOC_INIT_YAW1
+    #define PEER_LOC_INIT_YAW1 0.0f
+#endif
+#ifndef PEER_LOC_INIT_X2
+    #define PEER_LOC_INIT_X2 0.0f
+#endif
+#ifndef PEER_LOC_INIT_Y2    
+    #define PEER_LOC_INIT_Y2 0.0f
+#endif
+#ifndef PEER_LOC_INIT_Z2
+    #define PEER_LOC_INIT_Z2 0.0f
+#endif
+#ifndef PEER_LOC_INIT_YAW2
+    #define PEER_LOC_INIT_YAW2 0.0f
+#endif

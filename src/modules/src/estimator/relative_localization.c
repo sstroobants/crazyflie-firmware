@@ -18,19 +18,21 @@
 #include "estimator_complementary.h"
 #include "lpsTwrTag.h"
 
+#include "platform_defaults.h"
+
 #define RELATIVE_LOCALIZATION_RATE RATE_100_HZ
 #define RELATIVE_LOCALIZATION_DT 1.0f / RELATIVE_LOCALIZATION_RATE
 
 static bool isInit;
 
-float initX1 = 0.0f;   // initial relative position x
-float initY1 = 0.0f;   // initial relative position y
-float initZ1 = 0.0f;   // initial relative position z
-float initYaw1 = 0.0f; // initial relative yaw
-float initX2 = 0.0f;   // initial relative position x
-float initY2 = 0.0f;   // initial relative position y
-float initZ2 = 0.0f;   // initial relative position z
-float initYaw2 = 0.0f; // initial relative yaw
+float initX1 = PEER_LOC_INIT_X1;
+float initY1 = PEER_LOC_INIT_Y1;
+float initZ1 = PEER_LOC_INIT_Z1;
+float initYaw1 = PEER_LOC_INIT_YAW1;
+float initX2 = PEER_LOC_INIT_X2;
+float initY2 = PEER_LOC_INIT_Y2;
+float initZ2 = PEER_LOC_INIT_Z2;
+float initYaw2 = PEER_LOC_INIT_YAW2;
 
 // static float procNoise_velX = 0.25f;//0.22f;  //0.1f;  //0.08;   // velocity deviation
 // static float procNoise_velY = 0.35f;//0.31f;  //0.15f;  //0.12;   // velocity deviation
@@ -44,7 +46,7 @@ static float procNoise_velZ = 0.2f;  // 0.2f;//0.28f;  //0.2f;  //0.22;   // vel
 static float procNoise_ryaw = 0.12f; // 0.12f;   // yaw rate deviation
 static float measNoise_uwb = 0.1f;   // 0.06;   //0.04;    // ranging deviation
 
-static float InitCovPos = 10.0f;
+static float InitCovPos = 1.0f;
 static float InitCovYaw = 1.5f;
 
 static relaVariable_t relaVar[NumUWB];
@@ -360,12 +362,38 @@ PARAM_ADD(PARAM_FLOAT, sig_r, &procNoise_ryaw)
 PARAM_ADD(PARAM_FLOAT, noiUWB, &measNoise_uwb)
 PARAM_ADD(PARAM_FLOAT, Ppos, &InitCovPos)
 PARAM_ADD(PARAM_FLOAT, Pyaw, &InitCovYaw)
-PARAM_ADD(PARAM_FLOAT, init_X1, &initX1)
-PARAM_ADD(PARAM_FLOAT, init_Y1, &initY1)
-PARAM_ADD(PARAM_FLOAT, init_Z1, &initZ1)
-PARAM_ADD(PARAM_FLOAT, init_Yaw1, &initYaw1)
-PARAM_ADD(PARAM_FLOAT, init_X2, &initX2)
-PARAM_ADD(PARAM_FLOAT, init_Y2, &initY2)
-PARAM_ADD(PARAM_FLOAT, init_Z2, &initZ2)
-PARAM_ADD(PARAM_FLOAT, init_Yaw2, &initYaw2)
+//////////////////////////////////
+
+/**
+ * @brief Initial relative X robot 1
+ */
+PARAM_ADD(PARAM_FLOAT | PARAM_PERSISTENT, init_X1, &initX1)
+/**
+ * @brief Initial relative Y for robot 1
+ */
+PARAM_ADD(PARAM_FLOAT | PARAM_PERSISTENT, init_Y1, &initY1)
+/**
+ * @brief Initial relative Z for robot 1
+ */
+PARAM_ADD(PARAM_FLOAT | PARAM_PERSISTENT, init_Z1, &initZ1)
+/**
+ * @brief Initial relative Yaw for robot 1
+ */
+PARAM_ADD(PARAM_FLOAT | PARAM_PERSISTENT, init_Yaw1, &initYaw1)
+/**
+ * @brief Initial relative X for robot 2
+ */
+PARAM_ADD(PARAM_FLOAT | PARAM_PERSISTENT, init_X2, &initX2)
+/**
+ * @brief Initial relative Y for robot 2
+ */
+PARAM_ADD(PARAM_FLOAT | PARAM_PERSISTENT, init_Y2, &initY2)
+/**
+ * @brief Initial relative Z for robot 2
+ */
+PARAM_ADD(PARAM_FLOAT | PARAM_PERSISTENT, init_Z2, &initZ2)
+/**
+ * @brief Initial relative Yaw for robot 2
+ */
+PARAM_ADD(PARAM_FLOAT | PARAM_PERSISTENT, init_Yaw2, &initYaw2)
 PARAM_GROUP_STOP(relativeEKF)
