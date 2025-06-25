@@ -43,6 +43,8 @@
 
 #include "btree.h"
 #include "platform_defaults.h"
+#include "led.h"
+#include "ledseq.h"
 
 #define DEBUG_MODULE "AUTONOMOUS"
 #include "debug.h"
@@ -96,6 +98,29 @@ uint32_t avoidDuration = AUTNAV_AVOID_DURATION; // duration of the avoidance man
 float holdHeightScale = AUTNAV_HOLD_HEIGHT_SCALE; // scale for the height hold setpoint based on thrust
 float holdHeightDeadzone = AUTNAV_HOLD_HEIGHT_DEADZONE; // deadzone for the height hold setpoint
 
+// LED variables
+ledseqStep_t seq_dist_left_def[] = {
+  { true, LEDSEQ_WAITMS(50)},
+  {false, LEDSEQ_WAITMS(200)},
+  {    0, LEDSEQ_LOOP},
+};
+
+ledseqContext_t seq_dist_left = {
+  .sequence = seq_dist_left_def,
+  .led = LED_BLUE_NRF,
+};
+
+ledseqStep_t seq_dist_right_def[] = {
+  { true, LEDSEQ_WAITMS(50)},
+  {false, LEDSEQ_WAITMS(200)},
+  {    0, LEDSEQ_LOOP},
+};
+
+ledseqContext_t seq_dist_right = {
+  .sequence = seq_dist_right_def,
+  .led = LED_BLUE_L,
+};
+
 
 void getLogIds()
 {
@@ -119,6 +144,20 @@ void getLogIds()
 
   idPeerDistance = logGetVarId("ranging", "range0");
 
+}
+
+void turnOffLeds()
+{
+  // Turn off all LEDs
+  ledSet(LED_BLUE_L, 0);
+  ledSet(LED_BLUE_NRF, 0);
+}
+
+void turnOnLeds()
+{
+  // Turn on all LEDs
+  ledSet(LED_BLUE_L, 1);
+  ledSet(LED_BLUE_NRF, 1);
 }
 
 static void setHeightHoldSetpoint(setpoint_t *setpoint, float roll, float pitch, float z, float yawrate)
@@ -224,6 +263,10 @@ void appMain()
 {
   getLogIds();
 
+  // Register the LED sequence
+  ledseqRegisterSequence(&seq_dist_left);
+  ledseqRegisterSequence(&seq_dist_right);
+
   while (1)
   {
     // Currently running the app at 50Hz
@@ -271,7 +314,7 @@ void appMain()
       float vz = (cppmThrust - 32767) / 32767.0f;
       vz = (fabsf(vz) < holdHeightDeadzone) ? 0.0f : vz;
       holdHeight += vz * holdHeightScale;
-      
+
       // Pitch 6 degrees forward always, unless we are avoiding obstacles
       //pitchOffset = FORWARD_PITCH;
 
@@ -344,6 +387,7 @@ void appMain()
     }
   }
 }
+
 
 
 PARAM_GROUP_START(auto_nav)
