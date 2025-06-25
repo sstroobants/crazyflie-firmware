@@ -95,6 +95,18 @@ BTStatus moveForwardBT(BTNode *node, BTBlackboard *bb)
     return BT_RUNNING;
 }
 
+BTStatus turnLeftAndForwardBT(BTNode *node, BTBlackboard *bb)
+{
+    DEBUG_PRINT("Action Turn Left and Move Fwd\n");
+    bb->vx_cmd = FWD_VEL;
+    bb->r_cmd = TURN_RATE;
+    return BT_RUNNING;
+}
+
+
+
+
+
 // Conditions
 
 BTStatus randomConditionBT(BTNode *node, BTBlackboard *bb)
@@ -138,6 +150,21 @@ BTStatus leftOverRightBT(BTNode *node, BTBlackboard *bb)
     }
 }
 
+BTStatus withinPeerRange(BTNode *node, BTBlackboard *bb)
+{
+    // Check if the peer distance is within a certain range
+    if (bb->peerDist < 1.5f) 
+    {
+        DEBUG_PRINT("Peer is within range\n");
+        return BT_SUCCESS;
+    }
+    else
+    {
+        DEBUG_PRINT("Peer is out of range\n");
+        return BT_FAILURE;
+    }
+}
+
 // ==== Usable Behaviour Trees ======
 
 // Manually designed tree
@@ -147,6 +174,9 @@ static BTNode pathclear_node = {.type = BT_LEAF, .execute = pathClearBT};
 static BTNode turnleft_node = {.type = BT_LEAF, .execute = turnLeftBT};
 static BTNode turnright_node = {.type = BT_LEAF, .execute = turnRightBT};
 static BTNode moveforward_node = {.type = BT_LEAF, .execute = moveForwardBT};
+static BTNode fwd_left_node = {.type = BT_LEAF, .execute = turnLeftAndForwardBT};
+static BTNode peersphere_node = {.type = BT_LEAF, .execute = withinPeerRange};
+
 
 static BTNode *lr_sel_children[] = {&lr_smart_node, &turnright_node};
 BTNode lr_sel = {
@@ -175,13 +205,22 @@ BTNode obs_avoidance_sel = {
         .child_count = 2,
         .current_child = 0}};
 
-static BTNode *ManualTree_children[] = {&obs_avoidance_sel, &moveforward_node};
+static BTNode *peer_sphere_sel_children[] = {&peersphere_node, &fwd_left_node};
+BTNode peer_sphere_sel = {
+    .type = BT_SELECTOR,
+    .execute = executeBTSelector,
+    .composite = {
+        .children = peer_sphere_sel_children,
+        .child_count = 2,
+        .current_child = 0}};
+
+static BTNode *ManualTree_children[] = {&peer_sphere_sel, &obs_avoidance_sel, &moveforward_node};
 BTNode ManualTree = {
     .type = BT_SEQUENCE,
     .execute = executeBTSequence,
     .composite = {
         .children = ManualTree_children,
-        .child_count = 2,
+        .child_count = 3,
         .current_child = 0}};
 
 // static BTNode *ManualTree_children[] = {&lr_random_node, &moveforward_node};

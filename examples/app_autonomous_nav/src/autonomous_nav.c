@@ -71,6 +71,10 @@ float cppmRoll, cppmPitch, cppmYawrate, cppmThrust;
 // height variables
 int16_t bottom_ll_prev = 0;
 
+// UWB Ranging
+logVarId_t idPeerDistance;
+int peerDistance = 0;
+
 // mode variables
 bool isActive = false;
 bool setAutonomousMode = false;
@@ -112,6 +116,8 @@ void getLogIds()
   idCppmThrust = logGetVarId("cppm", "thrust");
 
   idHeightEstimate = logGetVarId("stateEstimate", "z");
+
+  idPeerDistance = logGetVarId("ranging", "range0");
 
 }
 
@@ -276,6 +282,7 @@ void appMain()
       bb.pathClear = !avoidForwardObstacles();
       bb.leftDist = forwardLL;
       bb.rightDist = forwardRR;
+      bb.peerDist = logGetInt(idPeerDistance) / 1000.0f; // Convert to meters
       
       BTStatus status = ManualTree.execute(&ManualTree, &bb);
       DEBUG_PRINT("Tree status: %d\n", status);

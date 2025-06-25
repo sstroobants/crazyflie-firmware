@@ -161,8 +161,8 @@ void relativeLocoTask(void *arg)
       {
         if (twrGetSwarmInfo(n, &dij, &vxj, &vyj, &vzj, &rj, &hj))
         {
-          DEBUG_PRINT("Swarm info received for drone %f: vxj %f, vyj %f, vzj %f, rj %f, hj %f\n",
-                      (double)n, (double)vxj, (double)vyj, (double)vzj, (double)rj, (double)hj);
+          DEBUG_PRINT("Swarm info received for drone %f: dij %f, vxj %f, vyj %f, vzj %f, rj %f, hj %f\n",
+                      (double)n, (double)dij, (double)vxj, (double)vyj, (double)vzj, (double)rj, (double)hj);
           connectCount = 0;
           complementaryGetSwarmInfo(&vxi, &vyi, &vzi, &ri, &hi);
           if (relaVar[n].receiveFlag)

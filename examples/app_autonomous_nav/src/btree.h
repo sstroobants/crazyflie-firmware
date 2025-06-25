@@ -24,6 +24,7 @@ typedef struct {
     float r_cmd;
     float leftDist;
     float rightDist;
+    float peerDist;
 } BTBlackboard;
 
 struct BTNode;
