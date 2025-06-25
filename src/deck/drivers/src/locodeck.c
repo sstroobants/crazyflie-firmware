@@ -163,18 +163,15 @@ static void buildAnchorMemList(const uint32_t memAddr, const uint8_t readLen, ui
 
 static void txCallback(dwDevice_t *dev)
 {
-  DEBUG_PRINT("locodeck tx callback\n");
   timeout = algorithm->onEvent(dev, eventPacketSent);
 }
 
 static void rxCallback(dwDevice_t *dev)
 {
-  DEBUG_PRINT("locodeck rx callback\n");
   timeout = algorithm->onEvent(dev, eventPacketReceived);
 }
 
 static void rxTimeoutCallback(dwDevice_t * dev) {
-  DEBUG_PRINT("locodeck rx timeout callback\n");
   timeout = algorithm->onEvent(dev, eventReceiveTimeout);
 }
 
@@ -352,8 +349,6 @@ static void uwbTask(void* parameters) {
   algoOptions.currentRangingMode = lpsMode_auto;
 
   systemWaitStart();
-
-  DEBUG_PRINT("UWB task started\n");
 
   while(1) {
     xSemaphoreTake(algoSemaphore, portMAX_DELAY);
