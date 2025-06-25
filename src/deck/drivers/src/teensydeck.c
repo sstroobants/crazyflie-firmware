@@ -299,11 +299,12 @@ LOG_ADD(LOG_UINT16, forward_ll, &myserial_control_out.dist_ll_forward)
 LOG_ADD(LOG_UINT16, forward_ml, &myserial_control_out.dist_ml_forward)
 LOG_ADD(LOG_UINT16, forward_mr, &myserial_control_out.dist_mr_forward)
 LOG_ADD(LOG_UINT16, forward_rr, &myserial_control_out.dist_rr_forward)
+LOG_ADD(LOG_UINT8, forward_new, &myserial_control_out.dist_forward_new)
 LOG_ADD(LOG_UINT16, bottom_ll, &myserial_control_out.dist_ll_bottom)
 LOG_ADD(LOG_UINT16, bottom_ml, &myserial_control_out.dist_ml_bottom)
 LOG_ADD(LOG_UINT16, bottom_mr, &myserial_control_out.dist_mr_bottom)
 LOG_ADD(LOG_UINT16, bottom_rr, &myserial_control_out.dist_rr_bottom)
-
+LOG_ADD(LOG_UINT8, bottom_new, &myserial_control_out.dist_bottom_new)
 LOG_GROUP_STOP(teensy)
 
 PARAM_GROUP_START(deck)

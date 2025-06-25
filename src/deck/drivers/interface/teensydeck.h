@@ -56,11 +56,14 @@ struct __attribute__((__packed__)) serial_control_out {
     int16_t dist_ml_bottom;
     int16_t dist_mr_bottom;
     int16_t dist_rr_bottom;
+    int8_t dist_bottom_new;
 
     int16_t dist_ll_forward;
     int16_t dist_ml_forward;
     int16_t dist_mr_forward;
     int16_t dist_rr_forward;
+    int8_t dist_forward_new;
+
     //CHECKSUM
     uint8_t checksum_out;
 };
