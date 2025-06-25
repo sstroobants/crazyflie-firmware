@@ -125,23 +125,23 @@ void relativeLocoTask(void *arg)
     relaVar[n].P[STATE_rlY][STATE_rlY] = InitCovPos;
     relaVar[n].P[STATE_rlZ][STATE_rlZ] = InitCovPos;
     relaVar[n].P[STATE_rlYaw][STATE_rlYaw] = InitCovYaw;
-    relaVar[n].S[STATE_rlX] = 0;
-    relaVar[n].S[STATE_rlY] = 0;     // relative position y
-    relaVar[n].S[STATE_rlZ] = 0;     // relative position z
-    relaVar[n].S[STATE_rlYaw] = 0; // relative yaw
+    // relaVar[n].S[STATE_rlX] = 0;
+    // relaVar[n].S[STATE_rlY] = 0;     // relative position y
+    // relaVar[n].S[STATE_rlZ] = 0;     // relative position z
+    // relaVar[n].S[STATE_rlYaw] = 0; // relative yaw
 
-    // if (n == 0) {
-    //   relaVar[n].S[STATE_rlX] = initX1; // relative position x
-    //   relaVar[n].S[STATE_rlY] = initY1; // relative position y
-    //   relaVar[n].S[STATE_rlZ] = initZ1; // relative position z
-    //   relaVar[n].S[STATE_rlYaw] = initYaw1; // relative yaw
-    // }
-    // if (n == 1) {
-    //   relaVar[n].S[STATE_rlX] = initX2; // relative position x
-    //   relaVar[n].S[STATE_rlY] = initY2; // relative position y
-    //   relaVar[n].S[STATE_rlZ] = initZ2; // relative position z
-    //   relaVar[n].S[STATE_rlYaw] = initYaw2; // relative yaw
-    // }
+    if (n == 0) {
+      relaVar[n].S[STATE_rlX] = initX1; // relative position x
+      relaVar[n].S[STATE_rlY] = initY1; // relative position y
+      relaVar[n].S[STATE_rlZ] = initZ1; // relative position z
+      relaVar[n].S[STATE_rlYaw] = initYaw1; // relative yaw
+    }
+    if (n == 1) {
+      relaVar[n].S[STATE_rlX] = initX2; // relative position x
+      relaVar[n].S[STATE_rlY] = initY2; // relative position y
+      relaVar[n].S[STATE_rlZ] = initZ2; // relative position z
+      relaVar[n].S[STATE_rlYaw] = initYaw2; // relative yaw
+    }
     relaVar[n].receiveFlag = false;
   }
 
@@ -151,7 +151,7 @@ void relativeLocoTask(void *arg)
   static uint32_t tick;
   while (1)
   {
-    vTaskDelay(1);
+    vTaskDelay(250);
     tick = xTaskGetTickCount();
     if (RATE_DO_EXECUTE(RELATIVE_LOCALIZATION_RATE, tick))
     {
@@ -159,6 +159,8 @@ void relativeLocoTask(void *arg)
       {
         if (twrGetSwarmInfo(n, &dij, &vxj, &vyj, &vzj, &rj, &hj))
         {
+          DEBUG_PRINT("Swarm info received for drone %f: vxj %f, vyj %f, vzj %f, rj %f, hj %f\n",
+                      (double)n, (double)vxj, (double)vyj, (double)vzj, (double)rj, (double)hj);
           connectCount = 0;
           complementaryGetSwarmInfo(&vxi, &vyi, &vzi, &ri, &hi);
           if (relaVar[n].receiveFlag)

@@ -8,6 +8,9 @@
 #include "estimator_kalman.h"
 #include "estimator_complementary.h"
 
+#include "debug.h"
+
+
 #define ANTENNA_OFFSET 154.6 // In meter
 #define basicAddr 0xbccf851300000000
 // Define: id = last_number_of_address - 5
@@ -220,6 +223,12 @@ static void rxcallback(dwDevice_t *dev)
       float selfGz2 = report2->selfGz;
       float selfh2 = report2->selfh;
       complementaryGetSwarmInfo(&selfVx2, &selfVy2, &selfVz2, &selfGz2, &selfh2);
+      report2->selfVx = selfVx2;
+      report2->selfVy = selfVy2;
+      report2->selfVz = selfVz2; 
+      report2->selfGz = selfGz2;
+      report2->selfh = selfh2;
+      
       report2->keep_flying = state.keep_flying;
       dwNewTransmit(dev);
       dwSetData(dev, (uint8_t *)&txPacket, MAC802154_HEADER_LENGTH + 2 + sizeof(lpsTwrTagReportPayload_t));
@@ -265,6 +274,12 @@ static void rxcallback(dwDevice_t *dev)
       float selfGz = report->selfGz;
       float selfh = report->selfh;
       complementaryGetSwarmInfo(&selfVx, &selfVy, &selfVz, &selfGz, &selfh);
+      report->selfVx = selfVx;
+      report->selfVy = selfVy;  
+      report->selfVz = selfVz;
+      report->selfGz = selfGz;
+      report->selfh = selfh;
+
       report->keep_flying = state.keep_flying;
       dwNewTransmit(dev);
       dwSetData(dev, (uint8_t *)&txPacket, MAC802154_HEADER_LENGTH + 2 + sizeof(lpsTwrTagReportPayload_t));
@@ -438,6 +453,8 @@ static void twrTagInit(dwDevice_t *dev)
   }
 
   state.keep_flying = false;
+
+  DEBUG_PRINT("twrtag initialized with ID: %d\n", selfID);
 #if NumUWB > 2
   checkTurn = false;
 #endif
