@@ -45,7 +45,7 @@
 #include "cf_math.h"
 
 static bool isInit = false;
-bool status = false;
+bool status = true; // TEST THIS
 
 
 //////////////COMMUNICATION VARIABLES///////////////////
