@@ -5,8 +5,11 @@
 #define DEBUG_MODULE "BTREE"
 #include "debug.h"
 
-#define TURN_RATE 0.5f
-#define FWD_VEL 0.3f
+#include "param.h"
+
+float turn_rate = 0.5f;
+float fwd_vel = 0.5f;
+float peer_radius = 2.0f; // meters
 
 // ========= Composite Nodes ===========
 
@@ -75,31 +78,31 @@ BTStatus executeBTSelector(BTNode *node, BTBlackboard *bb)
 
 BTStatus turnRightBT(BTNode *node, BTBlackboard *bb)
 {
-    DEBUG_PRINT("Action Turn Right\n");
-    bb->r_cmd = -TURN_RATE;
+    // DEBUG_PRINT("Action Turn Right\n");
+    bb->r_cmd = -turn_rate;
     return BT_RUNNING;
 }
 
 BTStatus turnLeftBT(BTNode *node, BTBlackboard *bb)
 {
-    DEBUG_PRINT("Action Turn Left\n");
-    bb->r_cmd = TURN_RATE;
+    // DEBUG_PRINT("Action Turn Left\n");
+    bb->r_cmd = turn_rate;
     return BT_RUNNING;
 }
 
 BTStatus moveForwardBT(BTNode *node, BTBlackboard *bb)
 {
-    DEBUG_PRINT("Action Move Fwd\n");
-    bb->vx_cmd = FWD_VEL;
+    // DEBUG_PRINT("Action Move Fwd\n");
+    bb->vx_cmd = fwd_vel;
     bb->r_cmd = 0.0f;
     return BT_RUNNING;
 }
 
 BTStatus turnLeftAndForwardBT(BTNode *node, BTBlackboard *bb)
 {
-    DEBUG_PRINT("Action Turn Left and Move Fwd\n");
-    bb->vx_cmd = FWD_VEL;
-    bb->r_cmd = TURN_RATE;
+    // DEBUG_PRINT("Action Turn Left and Move Fwd\n");
+    bb->vx_cmd = fwd_vel;
+    bb->r_cmd = turn_rate;
     return BT_RUNNING;
 }
 
@@ -111,7 +114,7 @@ BTStatus turnLeftAndForwardBT(BTNode *node, BTBlackboard *bb)
 
 BTStatus randomConditionBT(BTNode *node, BTBlackboard *bb)
 {
-    DEBUG_PRINT("Condition Random\n");
+    // DEBUG_PRINT("Condition Random\n");
     if (rand() % 2 == 0)
     {
         return BT_SUCCESS;
@@ -140,12 +143,12 @@ BTStatus leftOverRightBT(BTNode *node, BTBlackboard *bb)
 {
     if (bb->leftDist > bb->rightDist)
     {
-        DEBUG_PRINT("Left is freer than right\n");
+        // DEBUG_PRINT("Left is freer than right\n");
         return BT_SUCCESS;
     }
     else
     {
-        DEBUG_PRINT("Right is freer than left\n");
+        // DEBUG_PRINT("Right is freer than left\n");
         return BT_FAILURE;
     }
 }
@@ -153,9 +156,9 @@ BTStatus leftOverRightBT(BTNode *node, BTBlackboard *bb)
 BTStatus withinPeerRange(BTNode *node, BTBlackboard *bb)
 {
     // Check if the peer distance is within a certain range
-    if (bb->peerDist < 1.5f) 
+    if (bb->peerDist < peer_radius) 
     {
-        DEBUG_PRINT("Peer is within range\n");
+        // DEBUG_PRINT("Peer is within range\n");
         return BT_SUCCESS;
     }
     else
@@ -235,3 +238,10 @@ BTNode ManualTree = {
 // };
 
 // End manually designed tree
+
+
+PARAM_GROUP_START(btree)
+PARAM_ADD(PARAM_FLOAT, turnrate, &turn_rate)
+PARAM_ADD(PARAM_FLOAT, fwdvel, &fwd_vel)
+PARAM_ADD(PARAM_FLOAT, peerradius, &peer_radius)
+PARAM_GROUP_STOP(btree)

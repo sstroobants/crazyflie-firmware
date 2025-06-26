@@ -325,11 +325,13 @@ void appMain()
       bb.pathClear = !avoidForwardObstacles();
       bb.leftDist = forwardLL;
       bb.rightDist = forwardRR;
-      bb.peerDist = logGetInt(idPeerDistance) / 1000.0f; // Convert to meters
+      bb.peerDist = logGetInt(idPeerDistance) / 2000.0f; // Convert to meters
+      
+      DEBUG_PRINT("Peer distance: %f m\n", (double)bb.peerDist);
       
       BTStatus status = ManualTree.execute(&ManualTree, &bb);
-      DEBUG_PRINT("Tree status: %d\n", status);
 
+      if (0) DEBUG_PRINT("BT status: %d\n", status);
 
       yawRateOffset = bb.r_cmd * 57.3f * 2; // to degree/s
       pitchOffset = bb.vx_cmd * (-30.0f); // Map velocity command to pitch command
