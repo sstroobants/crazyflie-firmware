@@ -47,14 +47,6 @@
 #define DEBUG_MODULE "AUTONOMOUS"
 #include "debug.h"
 
-// #define HOLD_HEIGHT_SCALE 0.015f
-// #define HOLD_HEIGHT_DEADZONE 0.15f
-// #define OBSTACLE_MINIMUM_DISTANCE 1.0f // meters
-// #define AVOID_DURATION 800 // milliseconds
-// #define AVOID_PITCH 1.0f
-// #define FORWARD_PITCH -15.0f  
-// #define AVOID_YAWRATE 60.0f
-
 // Log variables
 // sensors
 logVarId_t idForwardLL, idForwardML, idForwardMR, idForwardRR;
@@ -67,6 +59,10 @@ float heightEstimate;
 // cppm radio channels
 logVarId_t idAux3, idCppmRoll, idCppmPitch, idCppmYawrate, idCppmThrust;
 float cppmRoll, cppmPitch, cppmYawrate, cppmThrust;
+
+// Param variables
+paramVarId_t idCanLog;
+paramVarId_t idLogEnabled;
 
 // height variables
 int16_t bottom_ll_prev = 0;
@@ -133,6 +129,8 @@ void getLogIds()
 
   idHeightEstimate = logGetVarId("stateEstimate", "z");
 
+  idCanLog = paramGetVarId("usd", "canLog");
+  idLogEnabled = paramGetVarId("usd", "logging");
 }
 
 void turnOffLeds()
@@ -312,6 +310,11 @@ void appMain()
         holdHeight = heightEstimate;
         setAutonomousMode = false;
 
+        if (paramGetUint(idCanLog))
+        {
+          paramSetInt(idLogEnabled, 1);
+        }
+
           // Turn on the LEDs
         ledseqRunBlocking(&seq_dist_left);
         ledseqRunBlocking(&seq_dist_right);
@@ -368,6 +371,7 @@ void appMain()
     {
       commanderRelaxPriority();
       setManualMode = false;
+      paramSetInt(idLogEnabled, 0);
       ledseqStopBlocking(&seq_dist_left);
       ledseqStopBlocking(&seq_dist_right);
       turnOnLeds();
