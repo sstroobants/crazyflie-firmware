@@ -147,8 +147,8 @@ void relativeLocoTask(void *arg)
     relaVar[n].receiveFlag = false;
   }
 
-  DEBUG_PRINT("Relative localization initialized with relX %f, relY %f, relZ %f, relYaw %f\n",
-              (double)relaVar[1].S[STATE_rlX], (double)relaVar[1].S[STATE_rlY], (double)relaVar[1].S[STATE_rlZ], (double)relaVar[1].S[STATE_rlYaw]);
+  // DEBUG_PRINT("Relative localization initialized with relX %f, relY %f, relZ %f, relYaw %f\n",
+  //             (double)relaVar[1].S[STATE_rlX], (double)relaVar[1].S[STATE_rlY], (double)relaVar[1].S[STATE_rlZ], (double)relaVar[1].S[STATE_rlYaw]);
 
   static uint32_t tick;
   while (1)

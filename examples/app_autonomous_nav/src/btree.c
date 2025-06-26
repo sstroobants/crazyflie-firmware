@@ -163,7 +163,7 @@ BTStatus withinPeerRange(BTNode *node, BTBlackboard *bb)
     }
     else
     {
-        DEBUG_PRINT("Peer is out of range\n");
+        //DEBUG_PRINT("Peer is out of range\n");
         return BT_FAILURE;
     }
 }

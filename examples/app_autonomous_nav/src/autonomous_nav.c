@@ -142,7 +142,7 @@ void getLogIds()
 
   idHeightEstimate = logGetVarId("stateEstimate", "z");
 
-  idPeerDistance = logGetVarId("ranging", "range0");
+  idPeerDistance = logGetVarId("ranging", "distance0");
 
 }
 
@@ -270,7 +270,7 @@ void appMain()
   while (1)
   {
     // Currently running the app at 50Hz
-    vTaskDelay(F2T(20));
+    vTaskDelay(F2T(30));
 
     // // Get the forward distances and print them
     // avoidForwardObstacles();
