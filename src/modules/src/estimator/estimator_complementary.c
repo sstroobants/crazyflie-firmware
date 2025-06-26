@@ -354,7 +354,7 @@ void estimatorComplementary(state_t *state, const uint32_t tick)
 
 void complementaryGetSwarmInfo(float* vx, float* vy, float* vz, float* gyroZ, float* posZ){
   *vx = estimator_state.velocity.x;
-  *vy= estimator_state.velocity.y;
+  *vy = estimator_state.velocity.y;
   *vz = estimator_state.velocity.z;
   *gyroZ = filtered_gz;
   // *gyroZ = 0.0f;
@@ -395,6 +395,15 @@ PARAM_GROUP_START(complementaryFilter)
   PARAM_ADD(PARAM_FLOAT, dragZ, &drag_coef.z)
   //PARAM_ADD(PARAM_FLOAT, cT, &thrust_coef)
 PARAM_GROUP_STOP(complementaryFilter)
+
+LOG_GROUP_START(estimator_stat)
+  LOG_ADD(PARAM_FLOAT, posX, &estimator_state.position.x)
+  LOG_ADD(PARAM_FLOAT, posY, &estimator_state.position.y)
+  LOG_ADD(PARAM_FLOAT, posZ, &estimator_state.position.z)
+  LOG_ADD(PARAM_FLOAT, velX, &estimator_state.velocity.x)
+  LOG_ADD(PARAM_FLOAT, velY, &estimator_state.velocity.y)
+  LOG_ADD(PARAM_FLOAT, velZ, &estimator_state.velocity.z)
+LOG_GROUP_STOP(estimator_stat)
 
 // PARAM_GROUP_START(velocityCFilter)
 //   PARAM_ADD(PARAM_FLOAT, vxK1, &cf_vx_params.k1)

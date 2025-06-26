@@ -49,14 +49,6 @@
 #define DEBUG_MODULE "AUTONOMOUS"
 #include "debug.h"
 
-// #define HOLD_HEIGHT_SCALE 0.015f
-// #define HOLD_HEIGHT_DEADZONE 0.15f
-// #define OBSTACLE_MINIMUM_DISTANCE 1.0f // meters
-// #define AVOID_DURATION 800 // milliseconds
-// #define AVOID_PITCH 1.0f
-// #define FORWARD_PITCH -15.0f  
-// #define AVOID_YAWRATE 60.0f
-
 // Log variables
 // sensors
 logVarId_t idForwardLL, idForwardML, idForwardMR, idForwardRR;
@@ -69,6 +61,10 @@ float heightEstimate;
 // cppm radio channels
 logVarId_t idAux3, idCppmRoll, idCppmPitch, idCppmYawrate, idCppmThrust;
 float cppmRoll, cppmPitch, cppmYawrate, cppmThrust;
+
+// Param variables
+paramVarId_t idCanLog;
+paramVarId_t idLogEnabled;
 
 // height variables
 int16_t bottom_ll_prev = 0;
@@ -100,8 +96,8 @@ float holdHeightDeadzone = AUTNAV_HOLD_HEIGHT_DEADZONE; // deadzone for the heig
 
 // LED variables
 ledseqStep_t seq_dist_left_def[] = {
-  { true, LEDSEQ_WAITMS(50)},
-  {false, LEDSEQ_WAITMS(200)},
+  { true, LEDSEQ_WAITMS(1950)},
+  {false, LEDSEQ_WAITMS(50)},
   {    0, LEDSEQ_LOOP},
 };
 
@@ -111,8 +107,8 @@ ledseqContext_t seq_dist_left = {
 };
 
 ledseqStep_t seq_dist_right_def[] = {
-  { true, LEDSEQ_WAITMS(50)},
-  {false, LEDSEQ_WAITMS(200)},
+  { true, LEDSEQ_WAITMS(1950)},
+  {false, LEDSEQ_WAITMS(50)},
   {    0, LEDSEQ_LOOP},
 };
 
@@ -142,6 +138,8 @@ void getLogIds()
 
   idHeightEstimate = logGetVarId("stateEstimate", "z");
 
+  idCanLog = paramGetVarId("usd", "canLog");
+  idLogEnabled = paramGetVarId("usd", "logging");
   idPeerDistance = logGetVarId("ranging", "distance0");
 
 }
@@ -159,6 +157,22 @@ void turnOnLeds()
   ledSet(LED_BLUE_L, 1);
   ledSet(LED_BLUE_NRF, 1);
 }
+
+void ledseqSetDistance(float distLeft, float distRight) {
+  // float leftScaled = distLeft / 4.0f;
+  int onTimeLeft = 125 * distLeft * distLeft;;
+  int offTimeLeft = 100;
+
+  // float rightScaled = distRight / 4.0f;
+  int onTimeRight = 125 * distRight * distRight;
+  int offTimeRight = 100;
+
+  seq_dist_left.sequence[0].action = onTimeLeft;
+  seq_dist_left.sequence[1].action = offTimeLeft;
+  seq_dist_right.sequence[0].action = onTimeRight;
+  seq_dist_right.sequence[1].action = offTimeRight;
+}
+
 
 static void setHeightHoldSetpoint(setpoint_t *setpoint, float roll, float pitch, float z, float yawrate)
 {
@@ -246,6 +260,8 @@ bool avoidForwardObstacles()
   forwardML = forward_ml > 0 ? (float) forward_ml / 1000.0f: 4.0f;
   forwardMR = forward_mr > 0 ? (float) forward_mr / 1000.0f: 4.0f;
   forwardRR = forward_rr > 0 ? (float) forward_rr / 1000.0f: 4.0f;
+
+  ledseqSetDistance((forwardLL + forwardML)/2, (forwardMR + forwardRR)/2);
   
   if (forwardML < obstacleMinimumDistance || forwardMR < obstacleMinimumDistance)
   {
@@ -304,6 +320,15 @@ void appMain()
         DEBUG_PRINT("Altitude at time of switching: %f\n", (double)heightEstimate);
         holdHeight = heightEstimate;
         setAutonomousMode = false;
+
+        if (paramGetUint(idCanLog))
+        {
+          paramSetInt(idLogEnabled, 1);
+        }
+
+          // Turn on the LEDs
+        ledseqRunBlocking(&seq_dist_left);
+        ledseqRunBlocking(&seq_dist_right);
       }
 
       setpoint_t setpoint;
@@ -386,6 +411,10 @@ void appMain()
     {
       commanderRelaxPriority();
       setManualMode = false;
+      paramSetInt(idLogEnabled, 0);
+      ledseqStopBlocking(&seq_dist_left);
+      ledseqStopBlocking(&seq_dist_right);
+      turnOnLeds();
     }
   }
 }
