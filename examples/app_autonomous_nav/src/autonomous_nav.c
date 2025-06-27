@@ -40,6 +40,8 @@
 #include "param.h"
 #include "log.h"
 #include "range.h"
+
+#include "btree.h"
 #include "platform_defaults.h"
 #include "led.h"
 #include "ledseq.h"
@@ -67,6 +69,10 @@ paramVarId_t idLogEnabled;
 // height variables
 int16_t bottom_ll_prev = 0;
 
+// UWB Ranging
+logVarId_t idPeerDistance;
+int peerDistance = 0;
+
 // mode variables
 bool isActive = false;
 bool setAutonomousMode = false;
@@ -76,6 +82,9 @@ float holdHeight = 0.0f;
 uint32_t startAvoidingTime;
 float yawRateOffset = 0.0f;
 float pitchOffset = 0.0f;
+
+// Behaviour Tree
+BTBlackboard bb;
 
 float forwardPitch = AUTNAV_FORWARD_PITCH; // pitch offset to apply when avoiding obstacles
 float avoidPitch = AUTNAV_AVOID_PITCH;
@@ -131,6 +140,8 @@ void getLogIds()
 
   idCanLog = paramGetVarId("usd", "canLog");
   idLogEnabled = paramGetVarId("usd", "logging");
+  idPeerDistance = logGetVarId("ranging", "distance0");
+
 }
 
 void turnOffLeds()
@@ -275,7 +286,7 @@ void appMain()
   while (1)
   {
     // Currently running the app at 50Hz
-    vTaskDelay(F2T(50));
+    vTaskDelay(F2T(30));
 
     // // Get the forward distances and print them
     // avoidForwardObstacles();
@@ -330,37 +341,66 @@ void appMain()
       holdHeight += vz * holdHeightScale;
 
       // Pitch 6 degrees forward always, unless we are avoiding obstacles
-      pitchOffset = forwardPitch;
+      //pitchOffset = FORWARD_PITCH;
 
-      bool startAvoiding = avoidForwardObstacles();
 
-      if (!avoiding && startAvoiding)
-      {
-        avoiding = true;
-        startAvoidingTime = T2M(xTaskGetTickCount());
-        DEBUG_PRINT("Obstacle detected, stopping!\n");
-        yawRateOffset = (forwardLL > forwardRR) ? avoidYawrate : -avoidYawrate;
-        // turnOffLeds();
-      }
 
-      if (avoiding)
-      {
-        // If we are avoiding obstacles, we pitch back a bit and yaw towards "most free" side
-        pitchOffset = avoidPitch;
-        uint32_t currentAvoidingTime = T2M(xTaskGetTickCount());
-        if (currentAvoidingTime - startAvoidingTime > avoidDuration) {
-          avoiding = false;
-          yawRateOffset = 0.0f; // Reset yaw rate offset
-          DEBUG_PRINT("Avoiding finished, resuming normal flight\n");
-          // turnOnLeds();
-        }
-      }
 
+      // // Begin BT code
+      bb.pathClear = !avoidForwardObstacles();
+      bb.leftDist = forwardLL;
+      bb.rightDist = forwardRR;
+      bb.peerDist = logGetInt(idPeerDistance) / 2000.0f; // Convert to meters
+      
+      // DEBUG_PRINT("Peer distance: %f m\n", (double)bb.peerDist);
+      
+      BTStatus status = ManualTree.execute(&ManualTree, &bb);
+
+      if (0) DEBUG_PRINT("BT status: %d\n", status);
+
+      yawRateOffset = bb.r_cmd * 57.3f * 2; // to degree/s
+      pitchOffset = bb.vx_cmd * (-30.0f); // Map velocity command to pitch command
+
+      // End BT code
+
+      //bool startAvoiding = avoidForwardObstacles();
+
+      // // Decision: turn left or right
+      // if (!avoiding && startAvoiding)
+      // {
+      //   avoiding = true;
+      //   startAvoidingTime = T2M(xTaskGetTickCount());
+      //   DEBUG_PRINT("Obstacle detected, stopping!\n");
+      //   if (forwardLL > forwardRR) {
+      //     // If left side is more free, yaw left
+      //     yawRateOffset = AVOID_YAWRATE; // rotate to the left
+      //   } else {
+      //     // If right side is more free, yaw right
+      //     yawRateOffset = -AVOID_YAWRATE; // rotate to the right
+      //   }
+      // }
+
+
+      // // Turning for AVOID_DURATION milliseconds
+      // if (avoiding)
+      // {
+      //   // If we are avoiding obstacles, we pitch back a bit and yaw towards "most free" side
+      //   pitchOffset = AVOID_PITCH;
+      //   uint32_t currentAvoidingTime = T2M(xTaskGetTickCount());
+      //   if (currentAvoidingTime - startAvoidingTime > AVOID_DURATION) {
+      //     avoiding = false;
+      //     yawRateOffset = 0.0f; // Reset yaw rate offset
+      //     DEBUG_PRINT("Avoiding finished, resuming normal flight\n");
+      //   }
+      // }
+
+      // Add to the manual control setpoints
       cppmPitch += pitchOffset;
       cppmYawrate += yawRateOffset;
 
       // DEBUG_PRINT("cppmRoll: %f, cppmPitch: %f, holdHeight: %f, cppmYawrate: %f\n", (double)cppmRoll, (double)cppmPitch, (double)holdHeight, (double)cppmYawrate);
-
+     
+      // Apply setpoints and altitude hold
       setHeightHoldSetpoint(&setpoint, cppmRoll, cppmPitch, holdHeight, cppmYawrate);
       commanderSetSetpoint(&setpoint, 3);
       DEBUG_PRINT("vz: %f\n", (double) holdHeight);
