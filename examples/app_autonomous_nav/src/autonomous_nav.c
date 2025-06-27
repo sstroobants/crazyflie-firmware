@@ -352,7 +352,7 @@ void appMain()
       bb.rightDist = forwardRR;
       bb.peerDist = logGetInt(idPeerDistance) / 2000.0f; // Convert to meters
       
-      DEBUG_PRINT("Peer distance: %f m\n", (double)bb.peerDist);
+      // DEBUG_PRINT("Peer distance: %f m\n", (double)bb.peerDist);
       
       BTStatus status = ManualTree.execute(&ManualTree, &bb);
 

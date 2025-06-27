@@ -314,11 +314,7 @@ void estimatorComplementary(state_t *state, const uint32_t tick)
       float ctheta = cos(-state->attitude.pitch*DEG2RAD);
       float stheta = sin(-state->attitude.pitch*DEG2RAD);
 
-      // Dynamic velocity model (linear drag)
-      tmp = GRAVITY_MAGNITUDE*stheta/ctheta - drag_coef.x*ctheta*ctheta*state->velocity.x;
-      state->velocity.x += POS_UPDATE_DT*tmp;
-      tmp = -GRAVITY_MAGNITUDE*sphi/ctheta/cphi - drag_coef.y*cphi*cphi*state->velocity.y;
-      state->velocity.y += POS_UPDATE_DT*tmp;
+      
 
       // Complementary filters with rotated (horizontal) acceleration
       test_states.velocity.x = state->velocity.x;
@@ -337,6 +333,16 @@ void estimatorComplementary(state_t *state, const uint32_t tick)
         positionPrediction.x += POS_UPDATE_DT * state->velocity.x;
         positionPrediction.y += POS_UPDATE_DT * state->velocity.y;
         positionPrediction.z = state->position.z;
+
+        // Dynamic velocity model (linear drag)
+        tmp = GRAVITY_MAGNITUDE*stheta/ctheta - drag_coef.x*ctheta*ctheta*state->velocity.x;
+        state->velocity.x += POS_UPDATE_DT*tmp;
+        tmp = -GRAVITY_MAGNITUDE*sphi/ctheta/cphi - drag_coef.y*cphi*cphi*state->velocity.y;
+        state->velocity.y += POS_UPDATE_DT*tmp;
+      } else {
+        // if not flying, reset velocity
+        state->velocity.x = 0.0f;
+        state->velocity.y = 0.0f;
       }
     }
   #endif

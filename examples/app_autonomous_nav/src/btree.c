@@ -7,8 +7,8 @@
 
 #include "param.h"
 
-float turn_rate = 0.5f;
-float fwd_vel = 0.5f;
+float turn_rate = 1.0f;
+float fwd_vel = 0.65f;
 float peer_radius = 2.0f; // meters
 
 // ========= Composite Nodes ===========
@@ -101,8 +101,9 @@ BTStatus moveForwardBT(BTNode *node, BTBlackboard *bb)
 BTStatus turnLeftAndForwardBT(BTNode *node, BTBlackboard *bb)
 {
     // DEBUG_PRINT("Action Turn Left and Move Fwd\n");
+    float home_turn_rate = fwd_vel / (bb->peerDist - peer_radius + 0.2f) / 2.0f;
     bb->vx_cmd = fwd_vel;
-    bb->r_cmd = turn_rate;
+    bb->r_cmd = home_turn_rate;
     return BT_RUNNING;
 }
 
@@ -177,8 +178,8 @@ static BTNode pathclear_node = {.type = BT_LEAF, .execute = pathClearBT};
 static BTNode turnleft_node = {.type = BT_LEAF, .execute = turnLeftBT};
 static BTNode turnright_node = {.type = BT_LEAF, .execute = turnRightBT};
 static BTNode moveforward_node = {.type = BT_LEAF, .execute = moveForwardBT};
-static BTNode fwd_left_node = {.type = BT_LEAF, .execute = turnLeftAndForwardBT};
-static BTNode peersphere_node = {.type = BT_LEAF, .execute = withinPeerRange};
+// static BTNode fwd_left_node = {.type = BT_LEAF, .execute = turnLeftAndForwardBT};
+// static BTNode peersphere_node = {.type = BT_LEAF, .execute = withinPeerRange};
 
 
 static BTNode *lr_sel_children[] = {&lr_smart_node, &turnright_node};
@@ -208,22 +209,22 @@ BTNode obs_avoidance_sel = {
         .child_count = 2,
         .current_child = 0}};
 
-static BTNode *peer_sphere_sel_children[] = {&peersphere_node, &fwd_left_node};
-BTNode peer_sphere_sel = {
-    .type = BT_SELECTOR,
-    .execute = executeBTSelector,
-    .composite = {
-        .children = peer_sphere_sel_children,
-        .child_count = 2,
-        .current_child = 0}};
+// static BTNode *peer_sphere_sel_children[] = {&peersphere_node, &fwd_left_node};
+// BTNode peer_sphere_sel = {
+//     .type = BT_SELECTOR,
+//     .execute = executeBTSelector,
+//     .composite = {
+//         .children = peer_sphere_sel_children,
+//         .child_count = 2,
+//         .current_child = 0}};
 
-static BTNode *ManualTree_children[] = {&peer_sphere_sel, &obs_avoidance_sel, &moveforward_node};
+static BTNode *ManualTree_children[] = {&obs_avoidance_sel, &moveforward_node};
 BTNode ManualTree = {
     .type = BT_SEQUENCE,
     .execute = executeBTSequence,
     .composite = {
         .children = ManualTree_children,
-        .child_count = 3,
+        .child_count = 2,
         .current_child = 0}};
 
 // static BTNode *ManualTree_children[] = {&lr_random_node, &moveforward_node};
