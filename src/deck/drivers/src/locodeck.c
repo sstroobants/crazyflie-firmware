@@ -527,7 +527,7 @@ static void dwm1000Init(DeckInfo *info)
   dwEnableMode(dwm, MODE_SHORTDATA_FAST_ACCURACY);
   #endif
 
-  dwSetChannel(dwm, CHANNEL_2);
+  dwSetChannel(dwm, CHANNEL_5);
   dwSetPreambleCode(dwm, PREAMBLE_CODE_64MHZ_9);
 
   #ifdef CONFIG_DECK_LOCO_FULL_TX_POWER
@@ -585,7 +585,7 @@ static const DeckDriver dwm1000_deck = {
   .usedGpio = DECK_USING_IO_1 | DECK_USING_PC10 | DECK_USING_PC11,
 #endif
   .usedPeriph = DECK_USING_SPI,
-  .requiredEstimator = StateEstimatorTypeKalman,
+  .requiredEstimator = StateEstimatorTypeComplementary,
   #ifdef LOCODECK_NO_LOW_INTERFERENCE
   .requiredLowInterferenceRadioMode = false,
   #else

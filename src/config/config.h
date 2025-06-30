@@ -161,7 +161,7 @@
 #define CPX_TASK_NAME             "CPX"
 #define APP_TASK_NAME             "APP"
 #define FLAPPERDECK_TASK_NAME     "FLAPPERDECK"
-#define TEENSY_TASK_NAME        "TEENSY"
+#define TEENSY_TASK_NAME          "TEENSY"
 
 //Task stack sizes
 #define SYSTEM_TASK_STACKSIZE           (2* configMINIMAL_STACK_SIZE)

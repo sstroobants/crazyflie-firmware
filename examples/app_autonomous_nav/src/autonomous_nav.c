@@ -59,6 +59,9 @@ float heightEstimate;
 // cppm radio channels
 logVarId_t idAux3, idCppmRoll, idCppmPitch, idCppmYawrate, idCppmThrust;
 float cppmRoll, cppmPitch, cppmYawrate, cppmThrust;
+// UWB 
+logVarId_t idPeerDistance;
+int peerDistance;
 
 // Param variables
 paramVarId_t idCanLog;
@@ -128,9 +131,11 @@ void getLogIds()
   idCppmThrust = logGetVarId("cppm", "thrust");
 
   idHeightEstimate = logGetVarId("stateEstimate", "z");
-
+  idPeerDistance = logGetVarId("ranging", "distance0");
+  
   idCanLog = paramGetVarId("usd", "canLog");
   idLogEnabled = paramGetVarId("usd", "logging");
+
 }
 
 void turnOffLeds()
