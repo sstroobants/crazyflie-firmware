@@ -45,7 +45,8 @@
 #include "cf_math.h"
 
 static bool isInit = false;
-bool status = true; // TEST THIS
+bool communicationStatus = false;
+bool status = true;
 
 
 //////////////COMMUNICATION VARIABLES///////////////////
@@ -80,8 +81,8 @@ float pidRateRollOutput, pidRatePitchOutput, pidRateYawOutput;
 
 // LED variables
 ledseqStep_t seq_noteensy_def[] = {
-  { true, LEDSEQ_WAITMS(50)},
-  {false, LEDSEQ_WAITMS(50)},
+  { true, LEDSEQ_WAITMS(75)},
+  {false, LEDSEQ_WAITMS(75)},
   {    0, LEDSEQ_LOOP},
 };
 
@@ -89,6 +90,19 @@ ledseqContext_t seq_noteensy = {
   .sequence = seq_noteensy_def,
   .led = SYS_LED,
 };
+
+void startNoTeensyLedSequence(void) {
+    ledseqStopBlocking(&seq_calibrated); // Stop the alive sequence
+    ledseqStopBlocking(&seq_alive); // Stop the alive sequence
+    vTaskDelay(M2T(5));
+    ledseqRunBlocking(&seq_noteensy); // Run the noteensy sequence
+}
+
+void stopNoTeensyLedSequence(void) {
+    ledseqStopBlocking(&seq_noteensy); // Stop the noteensy sequence
+    ledseqRunBlocking(&seq_calibrated); // Run the alive sequence
+    ledseqRunBlocking(&seq_alive); // Run the alive sequence
+}
 
 void serialParseMessageOut(void)
 {
@@ -136,16 +150,14 @@ void uartReadControlOutMessage(void)
     // if (!uart1GetCharWithTimeout(&serial_cf_byte_in, 100)) {
     if (!uart1GetDataWithTimeout(&serial_cf_byte_in, 200)) {
         receiving = false;
+
         // if status was true, set it to false for debugging purposes
-        if (status) {
-            DEBUG_PRINT("Did not receive message on time, trying to resend\n");
-            // Turn on the red LED to indicate error
-            ledseqStopBlocking(&seq_calibrated); // Stop the alive sequence
-            ledseqStopBlocking(&seq_alive); // Stop the alive sequence
-            vTaskDelay(M2T(5));
-            ledseqRunBlocking(&seq_noteensy); // Run the noteensy sequence
-            // ledSet(LED_RED_R, 1); // Turn on red LED to indicate error
-            status = false;
+        if (communicationStatus) {
+          DEBUG_PRINT("Did not receive message on time, trying to resend\n");
+          // Run led sequency to notify that we haven't received messages
+          // And also stop the alive/calibrated sequence
+          startNoTeensyLedSequence();
+          communicationStatus = false;
         }
     };
 
@@ -163,13 +175,11 @@ void uartReadControlOutMessage(void)
             serialParseMessageOut();
             serial_cf_received_packets++;
             // if status was false, set it to true for debugging purposes
-            if (!status) {
+            if (!communicationStatus) {
                 DEBUG_PRINT("Connection (re-)gained\n");
-                // Restart the led sequence
-                ledseqStopBlocking(&seq_noteensy); // Stop the noteensy sequence
-                ledseqRun(&seq_calibrated);
-                ledseqRun(&seq_alive);
-                status = true;
+                // Restart the alive/calibrated led sequence
+                stopNoTeensyLedSequence();
+                communicationStatus = true;
             }
         }
         else {
@@ -199,7 +209,6 @@ void uartSendControlInMessage(void)
     // set sending is false after message is sent
     sending = false;
     receiving = true;
-    // DEBUG_PRINT("Just sent data\n");
 }
 
 void teensyInit(DeckInfo* info)
@@ -239,8 +248,10 @@ void teensyInit(DeckInfo* info)
   // Register the LED sequence
   ledseqRegisterSequence(&seq_noteensy);
   
-//   Add delay to ensure the deck is ready before starting NOT NECESSARY?
-//   vTaskDelay(M2T(1000)); // Delay for 1 seconds (1000 ms)
+  //  Add delay to ensure the deck is ready before starting
+  //  Now when we start, the Teensy should have finished initializing
+  //  And the default LED sequences should have started. 
+  // vTaskDelay(M2T(3000)); // Delay for 1 seconds 
   xTaskCreate(teensyTask, TEENSY_TASK_NAME, TEENSY_TASK_STACKSIZE, NULL, TEENSY_TASK_PRI, NULL);
   
   DEBUG_PRINT("FINISHED CREATING TASK\n");
@@ -265,6 +276,9 @@ void teensyTask(void* arg)
   TickType_t xLastDebugTime;
   xLastDebugTime = T2M(xTaskGetTickCount());
 
+  TickType_t xLastForwardTime = 0;
+  TickType_t xLastBottomTime = 0;
+
   while (1) {
     if (sending) {
         setControlInMessage();
@@ -277,6 +291,33 @@ void teensyTask(void* arg)
         uartReadControlOutMessage();
         uint32_t after = T2M(xTaskGetTickCount());
         receiving_outer = receiving_outer + (after - now_ms);
+
+        // For both sensors, check timeout
+        if (myserial_control_out.dist_forward_new) {
+          xLastForwardTime = T2M(xTaskGetTickCount());
+        }
+
+        if (myserial_control_out.dist_bottom_new) {
+          xLastBottomTime = T2M(xTaskGetTickCount());
+        }
+
+        if ((T2M(xTaskGetTickCount()) - xLastForwardTime > 500) || (T2M(xTaskGetTickCount()) - xLastBottomTime > 500)) {
+          // If we have not received a forward or bottom message for more than 500ms, notify teensy failure
+          if (status) {
+            DEBUG_PRINT("Timeout: No forward or bottom message received for >500ms\n");
+            startNoTeensyLedSequence();
+            status = false; 
+          }
+            // Run led sequency to notify that we haven't received messages
+        } else {
+            // If we have received both messages, reset the noteensy sequence
+            if (!status) {
+              DEBUG_PRINT("Received messages from the sensors\n");
+              stopNoTeensyLedSequence();
+              status = true;
+            }
+        }
+
     } else {
         vTaskDelayUntil(&xLastWakeTime, F2T(100));
         sending = true;
@@ -284,7 +325,7 @@ void teensyTask(void* arg)
     // Printing the amount of received messages over the last seconds
     uint32_t now_ms = T2M(xTaskGetTickCount());
     if (now_ms - xLastDebugTime > 10000) {
-        DEBUG_PRINT("received %i messages in the last second, spent %i ms sending, %i receiving\n", serial_cf_received_packets, sending_outer, receiving_outer);
+        DEBUG_PRINT("received %i messages in the last 10 seconds, spent %i ms sending, %i receiving\n", serial_cf_received_packets, sending_outer, receiving_outer);
         // DEBUG_PRINT("Last received message: ll: %i, ml: %i, mr: %i, rr: %i \n", myserial_control_out.dist_ll_forward, myserial_control_out.dist_ml_forward, myserial_control_out.dist_mr_forward, myserial_control_out.dist_rr_forward);
         serial_cf_received_packets = 0;
         sending_outer = 0;
