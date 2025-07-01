@@ -194,7 +194,7 @@
 
 
 
-// // Autonomous navigation defaults
+// Autonomous navigation defaults
 #ifndef AUTNAV_AVOID_DURATION
     #define AUTNAV_AVOID_DURATION 800
 #endif
@@ -205,7 +205,7 @@
     #define AUTNAV_HOLD_HEIGHT_SCALE 0.015f
 #endif
 #ifndef AUTNAV_HOLD_HEIGHT_DEADZONE
-    #define AUTNAV_HOLD_HEIGHT_DEADZONE 0.15f
+    #define AUTNAV_HOLD_HEIGHT_DEADZONE 0.20f
 #endif
 #ifndef AUTNAV_OBSTACLE_MINIMUM_DISTANCE
     #define AUTNAV_OBSTACLE_MINIMUM_DISTANCE 1.0f
@@ -214,5 +214,5 @@
     #define AUTNAV_AVOID_PITCH 1.0f
 #endif
 #ifndef AUTNAV_FORWARD_PITCH
-    #define AUTNAV_FORWARD_PITCH -15.0f
+    #define AUTNAV_FORWARD_PITCH -16.0f
 #endif
