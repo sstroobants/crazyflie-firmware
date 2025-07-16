@@ -32,6 +32,7 @@
 #include "configblock.h"
 #include "estimator_kalman.h"
 #include "estimator_complementary.h"
+// #include "arm_math.h"
 
 #include "debug.h"
 
@@ -42,6 +43,8 @@
 static uint8_t selfID;
 static locoAddress_t selfAddress;
 // static const uint64_t antennaDelay = (ANTENNA_OFFSET * 499.2e6 * 128) / 299792458.0; // In radio tick
+
+// #define DERIV_HISTORY_LEN 6
 
 // Config
 static lpsTwrAlgoOptions_t defaultOptions = {
@@ -84,6 +87,7 @@ static lpsTwrAlgoOptions_t* options = &defaultOptions;
 typedef struct
 {
   uint16_t distance[LOCODECK_NR_OF_TWR_ANCHORS + 1];
+  // int16_t distance_rate[LOCODECK_NR_OF_TWR_ANCHORS + 1];
   float vx[LOCODECK_NR_OF_TWR_ANCHORS + 1];
   float vy[LOCODECK_NR_OF_TWR_ANCHORS + 1];
   float vz[LOCODECK_NR_OF_TWR_ANCHORS + 1];
@@ -118,10 +122,45 @@ static uint32_t checkTurnTick = 0;
 // Median filter for distance ranging (size=3)
 typedef struct
 {
+  // uint16_t deriv_history[DERIV_HISTORY_LEN];
+  // uint8_t fillCnt;
   uint16_t distance_history[3];
   uint8_t index_inserting;
 } median_data_t;
 static median_data_t median_data[LOCODECK_NR_OF_TWR_ANCHORS + 1];
+
+
+
+
+// int16_t compute_smoothed_derivative_uint16(const uint16_t *data, int n, float dt) {
+//     float sumX = 0.0f, sumY = 0.0f, sumXY = 0.0f, sumXX = 0.0f;
+
+//     // for (int i = 0; i < n; i++) {
+//       // DEBUG_PRINT("%d, ", data[i]);
+//     // }
+
+//     for (int i = 0; i < n; i++) {
+//         float x = i * dt;
+//         float y = (float)data[i];
+//         sumX  += x;
+//         sumY  += y;
+//         sumXY += x * y;
+//         sumXX += x * x;
+//     }
+
+//     float denom = n * sumXX - sumX * sumX;
+//     if (denom == 0.0f) return 0;
+
+//     float slope = (n*sumXY - sumX*sumY) / denom;
+
+//     /* clip into int16_t range */
+//     if (slope >  32767.f) slope =  32767.f;
+//     if (slope < -32768.f) slope = -32768.f;
+
+//     // DEBUG_PRINT("slope: %f\n", (double) slope);
+
+//     return (int16_t)(slope + (slope >= 0 ? 0.5f : -0.5f));  /* round */
+// }
 
 static uint16_t median_filter_3(uint16_t *data)
 {
@@ -141,6 +180,7 @@ static uint16_t median_filter_3(uint16_t *data)
   return middle;
 }
 #define ABS(a) ((a) > 0 ? (a) : -(a))
+#define ABS_DIFF_U16(a,b) ((uint16_t) ( (a) > (b) ? (a)-(b) : (b)-(a) ))
 
 static void txcallback(dwDevice_t *dev)
 {
@@ -263,7 +303,7 @@ static void rxcallback(dwDevice_t *dev) {
       if (calcDist != 0)
       {
         uint16_t medianDist = median_filter_3(median_data[current_receiveID].distance_history);
-        if (ABS(medianDist - calcDist) > 500)
+        if (ABS_DIFF_U16(medianDist, calcDist) > 500)
           state.distance[current_receiveID] = medianDist;
         else
           state.distance[current_receiveID] = calcDist;
@@ -271,6 +311,19 @@ static void rxcallback(dwDevice_t *dev) {
         if (median_data[current_receiveID].index_inserting == 3)
           median_data[current_receiveID].index_inserting = 0;
         median_data[current_receiveID].distance_history[median_data[current_receiveID].index_inserting] = calcDist;
+        
+
+        // memmove(&median_data[current_receiveID].deriv_history[0], &median_data[current_receiveID].deriv_history[1], (DERIV_HISTORY_LEN - 1) * sizeof(uint16_t));
+        // median_data[current_receiveID].deriv_history[DERIV_HISTORY_LEN - 1] = state.distance[current_receiveID];
+
+        // if (median_data[current_receiveID].fillCnt < DERIV_HISTORY_LEN) median_data[current_receiveID].fillCnt++;
+        // if (median_data[current_receiveID].fillCnt == DERIV_HISTORY_LEN) {
+        //     state.distance_rate[current_receiveID] = compute_smoothed_derivative_uint16(
+        //         median_data[current_receiveID].deriv_history, DERIV_HISTORY_LEN, 0.1f);
+        // } else {
+        //     state.distance_rate[current_receiveID] = 0;
+        // }
+
         rangingOk = true;
         state.vx[current_receiveID] = report->selfVx;
         state.vy[current_receiveID] = report->selfVy;
@@ -375,6 +428,18 @@ static void rxcallback(dwDevice_t *dev) {
         if (median_data[rangingID].index_inserting == 3)
           median_data[rangingID].index_inserting = 0;
         median_data[rangingID].distance_history[median_data[rangingID].index_inserting] = calcDist;
+
+        // memmove(&median_data[rangingID].deriv_history[0], &median_data[rangingID].deriv_history[1], (DERIV_HISTORY_LEN - 1) * sizeof(uint16_t));
+        // median_data[rangingID].deriv_history[DERIV_HISTORY_LEN - 1] = state.distance[rangingID];
+
+        // if (median_data[rangingID].fillCnt < DERIV_HISTORY_LEN) median_data[rangingID].fillCnt++;
+        // if (median_data[rangingID].fillCnt == DERIV_HISTORY_LEN) {
+        //     state.distance_rate[rangingID] = compute_smoothed_derivative_uint16(
+        //         median_data[rangingID].deriv_history, DERIV_HISTORY_LEN, 0.1f);
+        // } else {
+        //     state.distance_rate[rangingID] = 0;
+        // }
+
         state.vx[rangingID] = report2->selfVx;
         state.vy[rangingID] = report2->selfVy;
         state.vz[rangingID] = report2->selfVz;
@@ -392,12 +457,12 @@ static void rxcallback(dwDevice_t *dev) {
         current_mode_trans = true;
         dwIdle(dev);
         dwSetReceiveWaitTimeout(dev, 1000);
-        if (selfID == NumUWB - 1)
+        if (selfID == LOCODECK_NR_OF_TWR_ANCHORS)
           current_receiveID = 0;
         else
-          current_receiveID = NumUWB - 1;
+          current_receiveID = LOCODECK_NR_OF_TWR_ANCHORS;
         if (selfID == 0)
-          current_receiveID = NumUWB - 2; // immediate problem
+          current_receiveID = LOCODECK_NR_OF_TWR_ANCHORS - 1; // immediate problem
         txPacket.payload[LPS_TWR_TYPE] = LPS_TWR_POLL;
         txPacket.payload[LPS_TWR_SEQ] = 0;
         txPacket.sourceAddress = selfAddress;
@@ -624,4 +689,6 @@ LOG_ADD(LOG_UINT16, distance1, &state.distance[1])
 LOG_ADD(LOG_UINT16, distance2, &state.distance[2])
 LOG_ADD(LOG_UINT16, distance3, &state.distance[3])
 LOG_ADD(LOG_UINT16, distance4, &state.distance[4])
+// LOG_ADD(LOG_INT16, distance_rate0, &state.distance_rate[0])
+// LOG_ADD(LOG_INT16, distance_rate1, &state.distance_rate[1])
 LOG_GROUP_STOP(ranging)

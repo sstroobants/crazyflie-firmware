@@ -79,6 +79,9 @@ float holdHeight = 0.0f;
 uint32_t startAvoidingTime;
 float yawRateOffset = 0.0f;
 float pitchOffset = 0.0f;
+bool isReturning = false;
+bool canReturn = true;
+TickType_t xStartedReturningTime;
 
 float forwardPitch = AUTNAV_FORWARD_PITCH; // pitch offset to apply when avoiding obstacles
 float avoidPitch = AUTNAV_AVOID_PITCH;
@@ -87,6 +90,7 @@ float avoidYawrate = AUTNAV_AVOID_YAWRATE; // yaw rate to apply when avoiding ob
 uint32_t avoidDuration = AUTNAV_AVOID_DURATION; // duration of the avoidance maneuver in milliseconds
 float holdHeightScale = AUTNAV_HOLD_HEIGHT_SCALE; // scale for the height hold setpoint based on thrust
 float holdHeightDeadzone = AUTNAV_HOLD_HEIGHT_DEADZONE; // deadzone for the height hold setpoint
+uint16_t maxPeerDist = AUTNAV_MAX_PEER_DIST;
 
 // LED variables
 ledseqStep_t seq_dist_left_def[] = {
@@ -131,7 +135,7 @@ void getLogIds()
   idCppmThrust = logGetVarId("cppm", "thrust");
 
   idHeightEstimate = logGetVarId("stateEstimate", "z");
-  idPeerDistance = logGetVarId("ranging", "distance0");
+  idPeerDistance = logGetVarId("ranging", "distance1");
   
   idCanLog = paramGetVarId("usd", "canLog");
   idLogEnabled = paramGetVarId("usd", "logging");
@@ -361,6 +365,41 @@ void appMain()
         }
       }
 
+      // Check distance to peer
+      // TODO: Fix logic with the adjusted yawrate during returning and avoiding at the same time
+      uint16_t peerDist = logGetUint(idPeerDistance);
+      // DEBUG_PRINT("Peer distance: %d\n", peerDist);
+      if (peerDist > maxPeerDist) {
+        if (!isReturning && canReturn) {
+          DEBUG_PRINT("we start returning\n");
+          isReturning = true;
+          xStartedReturningTime = T2M(xTaskGetTickCount());
+          yawRateOffset = -avoidYawrate * 1.4f; // This doesn't actually avoid obstacles while rotating right?
+          canReturn = false;
+        }
+        if (T2M(xTaskGetTickCount()) - xStartedReturningTime > 2250) {
+          if (isReturning) {
+            DEBUG_PRINT("Finished a ~270degree turn\n");
+            isReturning = false;
+            yawRateOffset = -avoidYawrate * 0.2f;
+          }
+        }
+      } else { // back inside the sphere
+        if (!canReturn){
+          if (isReturning) {
+            DEBUG_PRINT("Back inside the circle before timer ran out\n");
+            yawRateOffset = 0.0f;
+            isReturning = false;
+            canReturn = true;
+          } else {
+            DEBUG_PRINT("Back inside the circle after the timer ran out\n");
+            yawRateOffset = 0.0f;
+            canReturn = true;
+          }
+        }
+      }
+
+
       cppmPitch += pitchOffset;
       cppmYawrate += yawRateOffset;
 
@@ -368,7 +407,6 @@ void appMain()
 
       setHeightHoldSetpoint(&setpoint, cppmRoll, cppmPitch, holdHeight, cppmYawrate);
       commanderSetSetpoint(&setpoint, 3);
-      DEBUG_PRINT("vz: %f\n", (double) holdHeight);
       // commanderGetSetpoint(&setpoint, &state);
       // DEBUG_PRINT("Setpoints: %f, %f, %f, %f\n", (double)setpoint.attitude.roll, (double)setpoint.attitude.pitch, (double)setpoint.attitudeRate.yaw, (double)setpoint.thrust);
     }
@@ -416,4 +454,9 @@ PARAM_ADD(PARAM_FLOAT | PARAM_PERSISTENT, holdHghtScale, &holdHeightScale)
  * @brief Deadzone for height hold setpoint
  */
 PARAM_ADD(PARAM_FLOAT | PARAM_PERSISTENT, holdHghtDeadzone, &holdHeightDeadzone)
+/**
+ * @brief Deadzone for height hold setpoint
+ */
+PARAM_ADD(PARAM_UINT16 | PARAM_PERSISTENT, maxPeerDist, &maxPeerDist)
+
 PARAM_GROUP_STOP(auto_nav)

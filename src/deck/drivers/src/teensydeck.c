@@ -151,12 +151,12 @@ void uartReadControlOutMessage(void)
     if (!uart1GetDataWithTimeout(&serial_cf_byte_in, 200)) {
         receiving = false;
 
+        startNoTeensyLedSequence();
         // if status was true, set it to false for debugging purposes
         if (communicationStatus) {
           DEBUG_PRINT("Did not receive message on time, trying to resend\n");
           // Run led sequency to notify that we haven't received messages
           // And also stop the alive/calibrated sequence
-          startNoTeensyLedSequence();
           communicationStatus = false;
         }
     };
