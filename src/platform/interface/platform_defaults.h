@@ -219,3 +219,12 @@
 #ifndef AUTNAV_MAX_PEER_DIST
     #define AUTNAV_MAX_PEER_DIST 2000
 #endif
+
+
+// EKF defaults
+#ifndef EKF_DRAG_BX
+    #define EKF_DRAG_BX 4.2f
+#endif
+#ifndef EKF_DRAG_BY
+    #define EKF_DRAG_BY 1.8f
+#endif
