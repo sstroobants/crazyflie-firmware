@@ -212,3 +212,21 @@
 #ifndef HEALTH_PROPELLER_TEST_THRESHOLD
     #define HEALTH_PROPELLER_TEST_THRESHOLD  0.0f
 #endif
+
+
+
+// Autonomous navigation defaults
+#ifndef AUTNAV_HOLD_HEIGHT_SCALE
+    #define AUTNAV_HOLD_HEIGHT_SCALE 0.013f
+#endif
+#ifndef AUTNAV_HOLD_HEIGHT_DEADZONE
+    #define AUTNAV_HOLD_HEIGHT_DEADZONE 0.25f
+#endif
+
+// EKF defaults
+#ifndef EKF_DRAG_BX
+    #define EKF_DRAG_BX 4.2f
+#endif
+#ifndef EKF_DRAG_BY
+    #define EKF_DRAG_BY 1.8f
+#endif
