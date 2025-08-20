@@ -185,8 +185,11 @@ void appMain()
       vz = (fabsf(vz) < holdHeightDeadzone) ? 0.0f : vz;
       holdHeight += vz * holdHeightScale;
 
-      DEBUG_PRINT("cppmRoll: %f, cppmPitch: %f, holdHeight: %f, cppmYawrate: %f\n", (double)cppmRoll, (double)cppmPitch, (double)holdHeight, (double)cppmYawrate);
+      // DEBUG_PRINT("cppmRoll: %f, cppmPitch: %f, holdHeight: %f, cppmYawrate: %f\n", (double)cppmRoll, (double)cppmPitch, (double)holdHeight, (double)cppmYawrate);
 
+      cppmRoll = (fabsf(cppmRoll) < 0.66f) ? 0.0f : cppmRoll;
+      cppmPitch = (fabsf(cppmPitch) < 0.66f) ? 0.0f : cppmPitch;
+      cppmYawrate = (fabsf(cppmYawrate) < 1.0f) ? 0.0f : cppmYawrate;
       setHeightHoldSetpoint(&setpoint, cppmRoll, cppmPitch, holdHeight, cppmYawrate);
       commanderSetSetpoint(&setpoint, 3);
       // commanderGetSetpoint(&setpoint, &state);
