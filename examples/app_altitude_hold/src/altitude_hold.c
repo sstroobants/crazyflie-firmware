@@ -87,14 +87,16 @@ void getLogIds()
 
 static void setHeightHoldSetpoint(setpoint_t *setpoint, float roll, float pitch, float z, float yawrate)
 {
-  setpoint->mode.x = modeVelocity;
-  setpoint->velocity.x = pitch * -0.03f;
-  setpoint->mode.y = modeVelocity;
-  setpoint->velocity.y = roll * -0.03f;
+  setpoint->mode.x = modeDisable;
+  setpoint->mode.y = modeDisable;
   setpoint->mode.z = modeAbs;
   setpoint->position.z = z;
   setpoint->mode.yaw = modeVelocity;
   setpoint->attitudeRate.yaw = yawrate;
+  setpoint->mode.roll = modeAbs;
+  setpoint->mode.pitch = modeAbs;
+  setpoint->attitude.roll = roll;
+  setpoint->attitude.pitch = pitch;
 }
 
 int16_t setActiveStatus()
@@ -190,11 +192,13 @@ void appMain()
       cppmRoll = (fabsf(cppmRoll) < 0.66f) ? 0.0f : cppmRoll;
       cppmPitch = (fabsf(cppmPitch) < 0.66f) ? 0.0f : cppmPitch;
       cppmYawrate = (fabsf(cppmYawrate) < 1.0f) ? 0.0f : cppmYawrate;
-      setHeightHoldSetpoint(&setpoint, cppmRoll, cppmPitch, holdHeight, cppmYawrate);
+
+
+      setHeightHoldSetpoint(&setpoint, 0.0f, -30.0f, 1.0f, 0.0f);
       commanderSetSetpoint(&setpoint, 3);
       // commanderGetSetpoint(&setpoint, &state);
       // DEBUG_PRINT("Setpoints: %f, %f, %f, %f\n", (double)setpoint.attitude.roll, (double)setpoint.attitude.pitch, (double)setpoint.attitudeRate.yaw, (double)setpoint.thrust);
-    }
+    } 
     else if (setManualMode)
     {
       commanderRelaxPriority();
