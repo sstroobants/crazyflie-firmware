@@ -527,7 +527,7 @@ static void dwm1000Init(DeckInfo *info)
   dwEnableMode(dwm, MODE_SHORTDATA_FAST_ACCURACY);
   #endif
 
-  dwSetChannel(dwm, CHANNEL_2);
+  dwSetChannel(dwm, CHANNEL_5);
   dwSetPreambleCode(dwm, PREAMBLE_CODE_64MHZ_9);
 
   #ifdef CONFIG_DECK_LOCO_FULL_TX_POWER
@@ -591,7 +591,6 @@ static const DeckDriver dwm1000_deck = {
   #else
   .requiredLowInterferenceRadioMode = true,
   #endif
-
 
   .init = dwm1000Init,
   .test = dwm1000Test,

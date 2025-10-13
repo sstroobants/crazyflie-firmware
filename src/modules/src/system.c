@@ -73,6 +73,7 @@
 #include "i2cdev.h"
 #include "autoconf.h"
 #include "vcp_esc_passthrough.h"
+#include "relative_localization.h"
 #if CONFIG_ENABLE_CPX
   #include "cpxlink.h"
 #endif
@@ -206,6 +207,7 @@ void systemTask(void *arg)
   deckInit();
   estimator = deckGetRequiredEstimator();
   stabilizerInit(estimator);
+  relativeLocoInit(); // initialize relative localization module
   if (deckGetRequiredLowInterferenceRadioMode() && platformConfigPhysicalLayoutAntennasAreClose())
   {
     platformSetLowInterferenceRadioMode();

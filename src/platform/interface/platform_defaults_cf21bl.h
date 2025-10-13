@@ -135,3 +135,24 @@
 #define PID_POS_VEL_Z_MAX 1.0f
 
 #define CONFIG_MOTORS_DEFAULT_IDLE_THRUST 7000
+
+
+// EKF Drag defaults
+#ifndef EKF_DRAG_BX
+    #define EKF_DRAG_BX 0.0f
+#endif
+#ifndef EKF_DRAG_BY
+    #define EKF_DRAG_BY 0.0f
+#endif
+#ifndef EKF_DRAG_BZ
+    #define EKF_DRAG_BZ 0.0f
+#endif
+#ifndef EKF_DRAG_RX
+    #define EKF_DRAG_RX 0.0f
+#endif
+#ifndef EKF_DRAG_RY
+    #define EKF_DRAG_RY 0.0f
+#endif
+#ifndef EKF_DRAG_RZ
+    #define EKF_DRAG_RZ 0.0f
+#endif

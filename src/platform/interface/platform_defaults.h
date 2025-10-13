@@ -223,22 +223,28 @@
     #define AUTNAV_HOLD_HEIGHT_DEADZONE 0.25f
 #endif
 
-// EKF defaults
-#ifndef EKF_DRAG_BX
-    #define EKF_DRAG_BX 4.2f
+// Peer localisation initials
+#ifndef PEER_LOC_INIT_X1
+    #define PEER_LOC_INIT_X1 0.0f
 #endif
-#ifndef EKF_DRAG_BY
-    #define EKF_DRAG_BY 1.8f
+#ifndef PEER_LOC_INIT_Y1
+    #define PEER_LOC_INIT_Y1 0.0f
 #endif
-#ifndef EKF_DRAG_BZ
-    #define EKF_DRAG_BZ 0.9f
+#ifndef PEER_LOC_INIT_Z1
+    #define PEER_LOC_INIT_Z1 0.0f
 #endif
-#ifndef EKF_DRAG_RX
-    #define EKF_DRAG_RX 0.0f
+#ifndef PEER_LOC_INIT_YAW1
+    #define PEER_LOC_INIT_YAW1 0.0f
 #endif
-#ifndef EKF_DRAG_RY
-    #define EKF_DRAG_RY 0.0f
+#ifndef PEER_LOC_INIT_X2
+    #define PEER_LOC_INIT_X2 0.0f
 #endif
-#ifndef EKF_DRAG_RZ
-    #define EKF_DRAG_RZ 0.11f
+#ifndef PEER_LOC_INIT_Y2    
+    #define PEER_LOC_INIT_Y2 0.0f
+#endif
+#ifndef PEER_LOC_INIT_Z2
+    #define PEER_LOC_INIT_Z2 0.0f
+#endif
+#ifndef PEER_LOC_INIT_YAW2
+    #define PEER_LOC_INIT_YAW2 0.0f
 #endif
