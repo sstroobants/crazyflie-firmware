@@ -1,6 +1,8 @@
 #include "relative_localization.h"
 #include "debug.h"
 
+#define DEBUG_MODULE "RELLOC"
+
 #include <string.h>
 #include <stdint.h>
 #include <math.h>
@@ -50,8 +52,8 @@ static float measNoise_uwb = 0.1f;   // 0.06;   //0.04;    // ranging deviation
 static float InitCovPos = 1.0f;
 static float InitCovYaw = 1.5f;
 
-static relaVariable_t relaVar[LOCODECK_NR_OF_TWR_ANCHORS];
-static float inputVar[LOCODECK_NR_OF_TWR_ANCHORS][STATE_DIM_rl];
+static relaVariable_t relaVar[LOCODECK_NR_OF_TWR_ANCHORS + 1];
+static float inputVar[LOCODECK_NR_OF_TWR_ANCHORS + 1][STATE_DIM_rl];
 
 static float A[STATE_DIM_rl][STATE_DIM_rl];
 static float h[STATE_DIM_rl] = {0};
@@ -115,7 +117,7 @@ void relativeLocoTask(void *arg)
   systemWaitStart();
 
   // Initialize EKF for relative localization
-  for (int n = 0; n < LOCODECK_NR_OF_TWR_ANCHORS; n++)
+  for (int n = 0; n < LOCODECK_NR_OF_TWR_ANCHORS + 1; n++)
   {
     for (int i = 0; i < STATE_DIM_rl; i++)
     {
@@ -160,12 +162,14 @@ void relativeLocoTask(void *arg)
     if (RATE_DO_EXECUTE(RELATIVE_LOCALIZATION_RATE, tick))
     {
       // DEBUG_PRINT("Relative EKF tick\n");
-      for (int n = 0; n < LOCODECK_NR_OF_TWR_ANCHORS; n++)
+      for (int n = 0; n < LOCODECK_NR_OF_TWR_ANCHORS + 1; n++)
       {
         if (twrGetSwarmInfo(n, &dij, &vxj, &vyj, &vzj, &rj, &hj))
         {
-          // DEBUG_PRINT("Swarm info received for drone %f: dij %f, vxj %f, vyj %f, vzj %f, rj %f, hj %f\n",
-          //             (double)n, (double)dij, (double)vxj, (double)vyj, (double)vzj, (double)rj, (double)hj);
+
+          DEBUG_PRINT("Swarm info received for drone %f: dij %f, vxj %f, vyj %f, vzj %f, rj %f, hj %f\n",
+                      (double)n, (double)dij, (double)vxj, (double)vyj, (double)vzj, (double)rj, (double)hj);
+
           connectCount = 0;
           swarmInfoGet(&vxi, &vyi, &vzi, &ri, &hi);
           if (relaVar[n].receiveFlag)
@@ -308,7 +312,7 @@ bool relativeInfoRead(float *relaVarParam, float *inputVarParam)
 {
   if (fullConnect)
   {
-    for (int i = 0; i < LOCODECK_NR_OF_TWR_ANCHORS; i++)
+    for (int i = 0; i < LOCODECK_NR_OF_TWR_ANCHORS + 1; i++)
     {
       *(relaVarParam + i * STATE_DIM_rl + STATE_rlX) = relaVar[i].S[STATE_rlX];
       *(relaVarParam + i * STATE_DIM_rl + STATE_rlY) = relaVar[i].S[STATE_rlY];
