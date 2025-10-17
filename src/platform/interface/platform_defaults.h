@@ -224,6 +224,9 @@
 #endif
 
 // Peer localisation initials
+#ifndef IS_ANCHOR
+    #define IS_ANCHOR 0
+#endif
 #ifndef PEER_LOC_INIT_X1
     #define PEER_LOC_INIT_X1 0.0f
 #endif

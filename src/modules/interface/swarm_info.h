@@ -7,15 +7,14 @@
 #include <stdint.h>
 
 typedef struct {
-  float vx; // m/s
-  float vy; // m/s
-  float vz; // m/s
+  float x; // m/s
+  float y; // m/s
   float gz; // deg/s (yaw rate)
   float h;  // m (height / z position)
 } swarm_info_t;
 
 // Called from the stabilizer loop (single writer)
-void swarmInfoUpdate(float vx, float vy, float vz, float gz, float h);
+void swarmInfoUpdate(float x, float y, float gz, float h);
 
 // Called from other modules (read latest snapshot)
-void swarmInfoGet(float* vx, float* vy, float* vz, float* gz, float* h);
+void swarmInfoGet(float* x, float* y, float* gz, float* h);

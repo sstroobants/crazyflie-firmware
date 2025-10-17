@@ -68,6 +68,8 @@
 #include "math3d.h"
 #include "static_mem.h"
 
+#include "debug.h"
+
 // #define DEBUG_STATE_CHECK
 
 // The drag coefficients, used to model the drag on the flapper
@@ -538,10 +540,15 @@ static void predictDt(kalmanCoreData_t* this, const kalmanCoreParams_t *params, 
     dy = this->S[KC_STATE_PY] * dt + acc->y * dt2 / 2.0f;
     dz = this->S[KC_STATE_PZ] * dt + acc->z * dt2 / 2.0f; // thrust can only be produced in the body's Z direction
 
+    // When not flying, we are stationary.
+    dx = 0;
+    dy = 0;
+    dz = 0;
+
     // position update
     this->S[KC_STATE_X] += this->R[0][0] * dx + this->R[0][1] * dy + this->R[0][2] * dz;
     this->S[KC_STATE_Y] += this->R[1][0] * dx + this->R[1][1] * dy + this->R[1][2] * dz;
-    this->S[KC_STATE_Z] += this->R[2][0] * dx + this->R[2][1] * dy + this->R[2][2] * dz - GRAVITY_MAGNITUDE * dt2 / 2.0f;
+    this->S[KC_STATE_Z] += this->R[2][0] * dx + this->R[2][1] * dy + this->R[2][2] * dz; // - GRAVITY_MAGNITUDE * dt2 / 2.0f;
 
     // keep previous time step's state for the update
     tmpSPX = this->S[KC_STATE_PX];
@@ -552,6 +559,11 @@ static void predictDt(kalmanCoreData_t* this, const kalmanCoreParams_t *params, 
     this->S[KC_STATE_PX] += dt * (acc->x + gyro->z * tmpSPY - gyro->y * tmpSPZ - GRAVITY_MAGNITUDE * this->R[2][0]);
     this->S[KC_STATE_PY] += dt * (acc->y - gyro->z * tmpSPX + gyro->x * tmpSPZ - GRAVITY_MAGNITUDE * this->R[2][1]);
     this->S[KC_STATE_PZ] += dt * (acc->z + gyro->y * tmpSPX - gyro->x * tmpSPY - GRAVITY_MAGNITUDE * this->R[2][2]);
+
+    // Assume stationary when not flying ADDED
+    this->S[KC_STATE_PX] = 0;
+    this->S[KC_STATE_PY] = 0;
+    this->S[KC_STATE_PZ] = 0;
   }
 
   // attitude update (rotate by gyroscope), we do this in quaternions

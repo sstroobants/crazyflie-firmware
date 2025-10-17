@@ -192,6 +192,10 @@ STATIC_MEM_TASK_ALLOC_STACK_NO_DMA_CCM_SAFE(kalmanTask, KALMAN_TASK_STACKSIZE);
 // Called one time during system startup
 void estimatorKalmanTaskInit() {
   kalmanCoreDefaultParams(&coreParams);
+
+  paramLogicStorageInit(); // call the initializer of the param storage again. 
+  // see issue https://github.com/bitcraze/crazyflie-firmware/issues/1517
+
   // It would be logical to set the params->attitudeReversion here, based on deck requirements, but the decks are
   // not initialized yet at this point so it is done in estimatorKalmanInit().
 
@@ -331,13 +335,17 @@ static void updateQueuedMeasurements(const uint32_t nowMs, const bool quadIsFlyi
         }
         break;
       case MeasurementTypeTOF:
-        kalmanCoreUpdateWithTof(&coreData, &m.data.tof);
+        if (quadIsFlying) {
+          kalmanCoreUpdateWithTof(&coreData, &m.data.tof);
+        }
         break;
       case MeasurementTypeAbsoluteHeight:
         kalmanCoreUpdateWithAbsoluteHeight(&coreData, &m.data.height);
         break;
       case MeasurementTypeFlow:
-        kalmanCoreUpdateWithFlow(&coreData, &m.data.flow, &gyroLatest);
+        if (quadIsFlying) {
+          kalmanCoreUpdateWithFlow(&coreData, &m.data.flow, &gyroLatest);
+        }
         break;
       case MeasurementTypeYawError:
         kalmanCoreUpdateWithYawError(&coreData, &m.data.yawError);
@@ -576,17 +584,17 @@ PARAM_GROUP_START(kalman)
   /**
  * @brief Initial X after reset [m]
  */
-  PARAM_ADD_CORE(PARAM_FLOAT, initialX, &coreParams.initialX)
+  PARAM_ADD_CORE(PARAM_FLOAT | PARAM_PERSISTENT, initialX, &coreParams.initialX)
   /**
  * @brief Initial Y after reset [m]
  */
-  PARAM_ADD_CORE(PARAM_FLOAT, initialY, &coreParams.initialY)
+  PARAM_ADD_CORE(PARAM_FLOAT | PARAM_PERSISTENT, initialY, &coreParams.initialY)
   /**
  * @brief Initial Z after reset [m]
  */
-  PARAM_ADD_CORE(PARAM_FLOAT, initialZ, &coreParams.initialZ)
+  PARAM_ADD_CORE(PARAM_FLOAT | PARAM_PERSISTENT, initialZ, &coreParams.initialZ)
   /**
  * @brief Initial yaw after reset [rad]
  */
-  PARAM_ADD_CORE(PARAM_FLOAT, initialYaw, &coreParams.initialYaw)
+  PARAM_ADD_CORE(PARAM_FLOAT | PARAM_PERSISTENT, initialYaw, &coreParams.initialYaw)
 PARAM_GROUP_STOP(kalman)

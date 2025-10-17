@@ -12,7 +12,7 @@
 
 #define LPS_TWR_TYPE 0
 #define LPS_TWR_SEQ 1
-#define LOCODECK_NR_OF_TWR_ANCHORS 1 // Number of other UWB devices used in the swarm
+#define LOCODECK_NR_OF_TWR_ANCHORS 2 // Number of other UWB devices used in the swarm
 
 extern uwbAlgorithm_t uwbTwrTagAlgorithm;
 
@@ -21,15 +21,14 @@ typedef struct {
   uint8_t answerTx[5];
   uint8_t finalRx[5];
   uint16_t reciprocalDistance;
-  float selfVx;
-  float selfVy;
-  float selfVz;
+  float selfX;
+  float selfY;
   float selfGz;
   float selfh;
   bool keep_flying;
 } __attribute__((packed)) lpsTwrTagReportPayload_t;
 
-bool twrGetSwarmInfo(int robNum, uint16_t* range, float* vx, float* vy, float* vz, float* gyroZ, float* height);
+bool twrGetSwarmInfo(int robNum, uint16_t* range, float* x, float* y, float* gyroZ, float* height);
 bool command_share(int RobIDfromControl, bool keep_flying);
 
 typedef struct {

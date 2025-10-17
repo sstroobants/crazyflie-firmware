@@ -135,6 +135,8 @@ static QueueHandle_t lppShortQueue;
 
 static uint32_t timeout;
 
+bool isAnchor = IS_ANCHOR;
+
 static STATS_CNT_RATE_DEFINE(spiWriteCount, 1000);
 static STATS_CNT_RATE_DEFINE(spiReadCount, 1000);
 
@@ -697,5 +699,6 @@ PARAM_GROUP_START(loco)
  * |   3   | TDoA 3 |\n
  */
 PARAM_ADD_CORE(PARAM_UINT8, mode, &algoOptions.userRequestedMode)
+PARAM_ADD_CORE(PARAM_UINT8 | PARAM_PERSISTENT, isAnchor, &isAnchor)
 
 PARAM_GROUP_STOP(loco)

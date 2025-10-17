@@ -30,7 +30,8 @@
 #include "FreeRTOS.h"
 #include "task.h"
 #include "configblock.h"
-#include "estimator_kalman.h"
+// #include "estimator_kalman.h"
+#include "estimator.h"
 // #include "estimator_complementary.h"
 #include "swarm_info.h"
 
@@ -85,9 +86,8 @@ static lpsTwrAlgoOptions_t* options = &defaultOptions;
 typedef struct
 {
   uint16_t distance[LOCODECK_NR_OF_TWR_ANCHORS + 1];
-  float vx[LOCODECK_NR_OF_TWR_ANCHORS + 1];
-  float vy[LOCODECK_NR_OF_TWR_ANCHORS + 1];
-  float vz[LOCODECK_NR_OF_TWR_ANCHORS + 1];
+  float x[LOCODECK_NR_OF_TWR_ANCHORS + 1];
+  float y[LOCODECK_NR_OF_TWR_ANCHORS + 1];
   float gz[LOCODECK_NR_OF_TWR_ANCHORS + 1];
   float h[LOCODECK_NR_OF_TWR_ANCHORS + 1];
   bool refresh[LOCODECK_NR_OF_TWR_ANCHORS + 1];
@@ -273,14 +273,26 @@ static void rxcallback(dwDevice_t *dev) {
           median_data[current_receiveID].index_inserting = 0;
         median_data[current_receiveID].distance_history[median_data[current_receiveID].index_inserting] = calcDist;
         rangingOk = true;
-        state.vx[current_receiveID] = report->selfVx;
-        state.vy[current_receiveID] = report->selfVy;
-        state.vz[current_receiveID] = report->selfVz;
+        state.x[current_receiveID] = report->selfX;
+        state.y[current_receiveID] = report->selfY;
         state.gz[current_receiveID] = report->selfGz;
         state.h[current_receiveID] = report->selfh;
         if (current_receiveID == 0)
           state.keep_flying = report->keep_flying;
         state.refresh[current_receiveID] = true;
+
+        // DEBUG_PRINT("Received reciprocal distance measurement from ID %d: %u mm from pos (%.2f, %.2f, %.2f)\n", current_receiveID, calcDist, (double)state.x[current_receiveID], (double)state.y[current_receiveID], (double)state.h[current_receiveID]);
+        if (isAnchor == 0)
+        {
+          distanceMeasurement_t dist;
+          dist.distance = (float)state.distance[current_receiveID] / 1000.0f;
+          dist.x = state.x[current_receiveID];
+          dist.y = state.y[current_receiveID];
+          dist.z = state.h[current_receiveID];
+          dist.anchorId = current_receiveID;
+          dist.stdDev = 0.25; // Make this depend on type of other crazyflie
+          estimatorEnqueueDistance(&dist);
+        }
       }
 
       lpsTwrTagReportPayload_t *report2 = (lpsTwrTagReportPayload_t *)(txPacket.payload + 2);
@@ -289,19 +301,16 @@ static void rxcallback(dwDevice_t *dev) {
       report2->reciprocalDistance = calcDist;
 
       // first load data into local variable to prevent memory misalignment warning
-      float selfVx2 = report2->selfVx;
-      float selfVy2 = report2->selfVy;
-      float selfVz2 = report2->selfVz;
+      float selfX2 = report2->selfX;
+      float selfY2 = report2->selfY;
       float selfGz2 = report2->selfGz;
       float selfh2 = report2->selfh;
 
-  // Fetch latest self state to include in the report
-  swarmInfoGet(&selfVx2, &selfVy2, &selfVz2, &selfGz2, &selfh2);
+      // Fetch latest self state to include in the report
+      swarmInfoGet(&selfX2, &selfY2, &selfGz2, &selfh2);
 
-
-      report2->selfVx = selfVx2;
-      report2->selfVy = selfVy2;
-      report2->selfVz = selfVz2; 
+      report2->selfX = selfX2;
+      report2->selfY = selfY2;
       report2->selfGz = selfGz2;
       report2->selfh = selfh2;
       
@@ -344,16 +353,15 @@ static void rxcallback(dwDevice_t *dev) {
       memcpy(&report->finalRx, &final_rx, 5);
       
       // first load data into local variable to prevent memory misalignment warning
-      float selfVx = report->selfVx;
-      float selfVy = report->selfVy;
-      float selfVz = report->selfVz;
+      float selfX= report->selfX;
+      float selfY = report->selfY;
       float selfGz = report->selfGz;
       float selfh = report->selfh;
-  // Fetch latest self state to include in the report
-  swarmInfoGet(&selfVx, &selfVy, &selfVz, &selfGz, &selfh);
-      report->selfVx = selfVx;
-      report->selfVy = selfVy;  
-      report->selfVz = selfVz;
+
+      // Fetch latest self state to include in the report
+      swarmInfoGet(&selfX, &selfY, &selfGz, &selfh);
+      report->selfX = selfX;
+      report->selfY = selfY;
       report->selfGz = selfGz;
       report->selfh = selfh;
 
@@ -381,14 +389,27 @@ static void rxcallback(dwDevice_t *dev) {
         if (median_data[rangingID].index_inserting == 3)
           median_data[rangingID].index_inserting = 0;
         median_data[rangingID].distance_history[median_data[rangingID].index_inserting] = calcDist;
-        state.vx[rangingID] = report2->selfVx;
-        state.vy[rangingID] = report2->selfVy;
-        state.vz[rangingID] = report2->selfVz;
+        state.x[rangingID] = report2->selfX;
+        state.y[rangingID] = report2->selfY;
         state.gz[rangingID] = report2->selfGz;
         state.h[rangingID] = report2->selfh;
         if (rangingID == 0)
           state.keep_flying = report2->keep_flying;
         state.refresh[rangingID] = true;
+
+        // DEBUG_PRINT("Received reciprocal distance measurement from ID %d: %u mm from pos (%.2f, %.2f, %.2f)\n", rangingID, report2->reciprocalDistance, (double)state.x[rangingID], (double)state.y[rangingID], (double)state.h[rangingID]);
+        // Push distance measurement to estimator if the drone is not an anchor
+        if (isAnchor == 0)
+        {
+          distanceMeasurement_t dist;
+          dist.distance = (float)state.distance[rangingID] / 1000.0f;
+          dist.x = state.x[rangingID];
+          dist.y = state.y[rangingID];
+          dist.z = state.h[rangingID];
+          dist.anchorId = rangingID;
+          dist.stdDev = 0.25; // Make this depend on type of other crazyflie
+          estimatorEnqueueDistance(&dist);
+        }
       }
       rangingOk = true;
 #if (LOCODECK_NR_OF_TWR_ANCHORS + 1) > 2
@@ -398,12 +419,12 @@ static void rxcallback(dwDevice_t *dev) {
         current_mode_trans = true;
         dwIdle(dev);
         dwSetReceiveWaitTimeout(dev, 1000);
-        if (selfID == LOCODECK_NR_OF_TWR_ANCHORS - 1)
+        if (selfID == LOCODECK_NR_OF_TWR_ANCHORS)
           current_receiveID = 0;
         else
-          current_receiveID = LOCODECK_NR_OF_TWR_ANCHORS - 1;
+          current_receiveID = LOCODECK_NR_OF_TWR_ANCHORS;
         if (selfID == 0)
-          current_receiveID = LOCODECK_NR_OF_TWR_ANCHORS - 2; // immediate problem
+          current_receiveID = LOCODECK_NR_OF_TWR_ANCHORS - 1; // immediate problem
         txPacket.payload[LPS_TWR_TYPE] = LPS_TWR_POLL;
         txPacket.payload[LPS_TWR_SEQ] = 0;
         txPacket.sourceAddress = selfAddress;
@@ -582,16 +603,15 @@ static uint8_t getActiveAnchorIdList(uint8_t unorderedAnchorList[], const int ma
   return count;
 }
 
-bool twrGetSwarmInfo(int robNum, uint16_t *range, float *vx, float *vy, float *vz, float *gyroZ, float *height)
+bool twrGetSwarmInfo(int robNum, uint16_t *range, float *x, float *y, float *gyroZ, float *height)
 {
   // DEBUG_PRINT("twrGetSwarmInfo called for robot %d\n", robNum);
   if (state.refresh[robNum] == true)
   {
     state.refresh[robNum] = false;
     *range = state.distance[robNum];
-    *vx = state.vx[robNum];
-    *vy = state.vy[robNum];
-    *vz = state.vz[robNum];
+    *x = state.x[robNum];
+    *y = state.y[robNum];
     *gyroZ = state.gz[robNum];
     *height = state.h[robNum];
     return (true);

@@ -331,9 +331,8 @@ static void stabilizerTask(void* param)
 
       // Publish latest values for UWB swarm telemetry
       swarmInfoUpdate(
-        state.velocity.x,   // [m/s]
-        state.velocity.y,   // [m/s]
-        state.velocity.z,   // [m/s]
+        state.position.x,   // [m]
+        state.position.y,   // [m]
         sensorData.gyro.z,  // [deg/s]
         state.position.z    // [m]
       );
