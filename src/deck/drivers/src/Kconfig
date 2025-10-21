@@ -503,3 +503,8 @@ config DECK_LOADCELL
     help
         Enables the support for the NAU7802 loadcell.
       
+config DECK_TEENSY
+    bool "Support the Teensy deck"
+    default n
+    help
+        Enables the Teensy deck driver on UART1.
