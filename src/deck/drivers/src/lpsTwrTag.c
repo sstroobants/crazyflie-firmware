@@ -204,6 +204,15 @@ static void rxcallback(dwDevice_t *dev) {
 
   dwGetData(dev, (uint8_t*)&rxPacket, dataLength);
 
+  // Debug: log what IDs 1 and 2 are receiving
+  // uint8_t pktType = rxPacket.payload[LPS_TWR_TYPE];
+  // DEBUG_PRINT("RX(self=%u): src=%02x dst=%02x type=%u len=%d\n",
+      // selfID,
+      // (unsigned)(rxPacket.sourceAddress & 0xFF),
+      // (unsigned)(rxPacket.destAddress & 0xFF),
+      // pktType,
+      // dataLength);
+
   if (rxPacket.destAddress != selfAddress) {
     if (current_mode_trans)
     {
@@ -290,7 +299,7 @@ static void rxcallback(dwDevice_t *dev) {
           dist.y = state.y[current_receiveID];
           dist.z = state.h[current_receiveID];
           dist.anchorId = current_receiveID;
-          dist.stdDev = 0.25; // Make this depend on type of other crazyflie
+          dist.stdDev = 0.3; // Make this depend on type of other crazyflie
           estimatorEnqueueDistance(&dist);
         }
       }
@@ -418,7 +427,7 @@ static void rxcallback(dwDevice_t *dev) {
       {
         current_mode_trans = true;
         dwIdle(dev);
-        dwSetReceiveWaitTimeout(dev, 1000);
+        dwSetReceiveWaitTimeout(dev, 3000);
         if (selfID == LOCODECK_NR_OF_TWR_ANCHORS)
           current_receiveID = 0;
         else
@@ -453,6 +462,9 @@ static void rxcallback(dwDevice_t *dev) {
 static uint32_t twrTagOnEvent(dwDevice_t *dev, uwbEvent_t event)
 {
   // TODO: Nothing is done with failedRanging. This should be calculated
+  // if (event != eventReceiveTimeout) {
+    // DEBUG_PRINT("TWR Tag event: %d\n", event);
+  // }
   switch(event) {
     case eventPacketReceived:
       rxcallback(dev);
@@ -487,7 +499,7 @@ static uint32_t twrTagOnEvent(dwDevice_t *dev, uwbEvent_t event)
           {
             current_mode_trans = true;
             dwIdle(dev);
-            dwSetReceiveWaitTimeout(dev, 1000);
+            dwSetReceiveWaitTimeout(dev, 3000);
             txPacket.payload[LPS_TWR_TYPE] = LPS_TWR_POLL;
             txPacket.payload[LPS_TWR_SEQ] = 0;
             txPacket.sourceAddress = selfAddress;
@@ -536,7 +548,7 @@ static void twrTagInit(dwDevice_t *dev)
   {
     current_receiveID = (LOCODECK_NR_OF_TWR_ANCHORS + 1) - 1;
     current_mode_trans = true;
-    dwSetReceiveWaitTimeout(dev, 1000);
+    dwSetReceiveWaitTimeout(dev, 3000);
   }
   else
   {

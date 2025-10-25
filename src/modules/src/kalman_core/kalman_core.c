@@ -130,8 +130,8 @@ static void assertStateNotNaN(const kalmanCoreData_t* this)
 
 void kalmanCoreDefaultParams(kalmanCoreParams_t* params)
 {
-  // Initial variances, uncertain of position, but know we're stationary and roughly flat
-  params->stdDevInitialPosition_xy = 100;
+  // Initial variances, certain of position, but know we're stationary and roughly flat
+  params->stdDevInitialPosition_xy = 1;
   params->stdDevInitialPosition_z = 1;
   params->stdDevInitialVelocity = 0.01;
   params->stdDevInitialAttitude_rollpitch = 0.01;
@@ -540,15 +540,10 @@ static void predictDt(kalmanCoreData_t* this, const kalmanCoreParams_t *params, 
     dy = this->S[KC_STATE_PY] * dt + acc->y * dt2 / 2.0f;
     dz = this->S[KC_STATE_PZ] * dt + acc->z * dt2 / 2.0f; // thrust can only be produced in the body's Z direction
 
-    // When not flying, we are stationary.
-    dx = 0;
-    dy = 0;
-    dz = 0;
-
     // position update
     this->S[KC_STATE_X] += this->R[0][0] * dx + this->R[0][1] * dy + this->R[0][2] * dz;
     this->S[KC_STATE_Y] += this->R[1][0] * dx + this->R[1][1] * dy + this->R[1][2] * dz;
-    this->S[KC_STATE_Z] += this->R[2][0] * dx + this->R[2][1] * dy + this->R[2][2] * dz; // - GRAVITY_MAGNITUDE * dt2 / 2.0f;
+    this->S[KC_STATE_Z] += this->R[2][0] * dx + this->R[2][1] * dy + this->R[2][2] * dz - GRAVITY_MAGNITUDE * dt2 / 2.0f;
 
     // keep previous time step's state for the update
     tmpSPX = this->S[KC_STATE_PX];
@@ -559,11 +554,6 @@ static void predictDt(kalmanCoreData_t* this, const kalmanCoreParams_t *params, 
     this->S[KC_STATE_PX] += dt * (acc->x + gyro->z * tmpSPY - gyro->y * tmpSPZ - GRAVITY_MAGNITUDE * this->R[2][0]);
     this->S[KC_STATE_PY] += dt * (acc->y - gyro->z * tmpSPX + gyro->x * tmpSPZ - GRAVITY_MAGNITUDE * this->R[2][1]);
     this->S[KC_STATE_PZ] += dt * (acc->z + gyro->y * tmpSPX - gyro->x * tmpSPY - GRAVITY_MAGNITUDE * this->R[2][2]);
-
-    // Assume stationary when not flying ADDED
-    this->S[KC_STATE_PX] = 0;
-    this->S[KC_STATE_PY] = 0;
-    this->S[KC_STATE_PZ] = 0;
   }
 
   // attitude update (rotate by gyroscope), we do this in quaternions

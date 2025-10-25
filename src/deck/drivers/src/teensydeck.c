@@ -295,6 +295,8 @@ static const DeckDriver teensy_deck = {
   .name = "bcTeensy",
   .usedGpio = 0,
   .usedPeriph = DECK_USING_UART2,
+  .requiredEstimator = StateEstimatorTypeKalman,
+  .requiredKalmanEstimatorAttitudeReversionOff = true,
   .init = teensyInit,
   .test = teensyTest,
 };

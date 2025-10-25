@@ -42,7 +42,8 @@ void kalmanCoreUpdateWithDistance(kalmanCoreData_t* this, distanceMeasurement_t*
     // The measurement is: z = sqrt(dx^2 + dy^2 + dz^2). The derivative dz/dX gives h.
     h[KC_STATE_X] = dx/predictedDistance;
     h[KC_STATE_Y] = dy/predictedDistance;
-    h[KC_STATE_Z] = dz/predictedDistance;
+    // h[KC_STATE_Z] = dz/predictedDistance;
+    h[KC_STATE_Z] = 0.0f; // We do not use altitude information from distance measurements
   } else {
     // Avoid divide by zero
     h[KC_STATE_X] = 1.0f;

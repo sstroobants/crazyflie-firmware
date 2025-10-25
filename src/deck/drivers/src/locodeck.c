@@ -60,6 +60,7 @@
 
 
 #define CS_PIN DECK_GPIO_IO1
+#define LOCODECK_NO_LOW_INTERFERENCE
 
 // LOCO deck alternative IRQ and RESET pins(IO_2, IO_3) instead of default (RX1, TX1), leaving UART1 free for use
 #ifdef CONFIG_DECK_LOCODECK_USE_ALT_PINS
