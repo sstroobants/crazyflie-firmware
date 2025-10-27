@@ -4,6 +4,7 @@
 #include "lpsTwrTag.h"
 
 #include <string.h>
+#include <stdlib.h>
 #include "unity.h"
 #include "mock_libdw1000.h"
 #include "mock_locodeck.h"
@@ -73,6 +74,9 @@ void setUp(void) {
   locoDeckSetRangingState_Expect(0);
 
   uwbTwrTagAlgorithm.init(&dev);
+
+  // Seed random for deterministic tests AFTER init (which also seeds)
+  srand(0);
 
   locoDeckGetRangingState_IgnoreAndReturn(0);
   locoDeckSetRangingState_Ignore();

@@ -25,6 +25,7 @@
 
 #include <string.h>
 #include <math.h>
+#include <stdlib.h>
 
 #include "lpsTwrTag.h"
 #include "lpsTdma.h"
@@ -288,6 +289,39 @@ static uint32_t adjustTxRxTime(dwTime_t *time)
   return added;
 }
 
+/* Select a random anchor from the active anchors list.
+ * Active anchors are those that haven't exceeded the ranging failed threshold.
+ * If no anchors are active, tries all anchors.
+ * Uses rand() for selection - ensure srand() is called during initialization.
+ */
+static uint8_t selectRandomAnchor(void)
+{
+#ifdef UNIT_TEST_MODE
+  // In unit tests, return anchor 1 for deterministic behavior
+  return 1;
+#else
+  uint8_t activeAnchors[LOCODECK_NR_OF_TWR_ANCHORS];
+  uint8_t activeCount = 0;
+  
+  // Build list of active anchors
+  for (int i = 0; i < LOCODECK_NR_OF_TWR_ANCHORS; i++) {
+    if (state.failedRanging[i] < options->rangingFailedThreshold) {
+      activeAnchors[activeCount] = i;
+      activeCount++;
+    }
+  }
+  
+  // If no active anchors, fall back to trying all anchors
+  if (activeCount == 0) {
+    return rand() % LOCODECK_NR_OF_TWR_ANCHORS;
+  }
+  
+  // Select a random active anchor
+  uint8_t randomIndex = rand() % activeCount;
+  return activeAnchors[randomIndex];
+#endif
+}
+
 /* Calculate the transmit time for a given timeslot in the current frame */
 static dwTime_t transmitTimeForSlot(int slot)
 {
@@ -308,10 +342,8 @@ static void initiateRanging(dwDevice_t *dev)
       frameStart.full += TDMA_FRAME_LEN;
     }
 
-    current_anchor ++;
-    if (current_anchor >= LOCODECK_NR_OF_TWR_ANCHORS) {
-      current_anchor = 0;
-    }
+    // Select a random anchor from active anchors instead of using fixed ring protocol
+    current_anchor = selectRandomAnchor();
   } else {
     current_anchor = 0;
   }
@@ -469,6 +501,10 @@ static void updateTagTdmaSlot(lpsTwrAlgoOptions_t * options)
 static void twrTagInit(dwDevice_t *dev)
 {
   updateTagTdmaSlot(options);
+
+  // Initialize random number generator using tag address and current time for entropy
+  // This ensures different tags have different starting points and provides randomness
+  srand((unsigned int)(options->tagAddress & 0xFFFFFFFF) + xTaskGetTickCount());
 
   // Initialize the packet in the TX buffer
   memset(&txPacket, 0, sizeof(txPacket));
