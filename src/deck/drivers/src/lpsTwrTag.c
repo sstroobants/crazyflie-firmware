@@ -46,21 +46,23 @@ static uint8_t selfID;
 static locoAddress_t selfAddress;
 // static const uint64_t antennaDelay = (ANTENNA_OFFSET * 499.2e6 * 128) / 299792458.0; // In radio tick
 
+// Swarm size runtime control
+// Capacity stays compile-time, behavior bounded at runtime by swarmSize
+#define MAX_SWARM_SIZE (LOCODECK_NR_OF_TWR_ANCHORS + 1)
+
 // Swarm size: total number of crazyflies in the swarm (including self)
-static const uint8_t swarmSize = LOCODECK_NR_OF_TWR_ANCHORS + 1;
+static uint8_t swarmSize = MAX_SWARM_SIZE;
+
+static inline uint8_t effectiveSwarmSize(void) {
+  uint8_t n = swarmSize;
+  if (n < 1) n = 1; // at least self
+  if (n > MAX_SWARM_SIZE) n = MAX_SWARM_SIZE;
+  return n;
+}
 
 // Config
 static lpsTwrAlgoOptions_t defaultOptions = {
    .tagAddress = 0xbccf000000000008,
-   .anchorAddress = {
-     0xbccf000000000000
- #if LOCODECK_NR_OF_TWR_ANCHORS > 6
-     0xbccf000000000006,
- #endif
- #if LOCODECK_NR_OF_TWR_ANCHORS > 7
-     0xbccf000000000007,
- #endif
-   },
    .antennaDelay = LOCODECK_ANTENNA_DELAY,
    .rangingFailedThreshold = 6,
 
@@ -89,12 +91,12 @@ static lpsTwrAlgoOptions_t* options = &defaultOptions;
 
 typedef struct
 {
-  uint16_t distance[LOCODECK_NR_OF_TWR_ANCHORS + 1];
-  float x[LOCODECK_NR_OF_TWR_ANCHORS + 1];
-  float y[LOCODECK_NR_OF_TWR_ANCHORS + 1];
-  float gz[LOCODECK_NR_OF_TWR_ANCHORS + 1];
-  float h[LOCODECK_NR_OF_TWR_ANCHORS + 1];
-  bool refresh[LOCODECK_NR_OF_TWR_ANCHORS + 1];
+  uint16_t distance[MAX_SWARM_SIZE];
+  float x[MAX_SWARM_SIZE];
+  float y[MAX_SWARM_SIZE];
+  float gz[MAX_SWARM_SIZE];
+  float h[MAX_SWARM_SIZE];
+  bool refresh[MAX_SWARM_SIZE];
   bool keep_flying;
   int failedRanging[LOCODECK_NR_OF_TWR_ANCHORS];
 } swarmInfo_t;
@@ -115,7 +117,7 @@ static bool rangingOk;
 static bool current_mode_trans;
 static uint8_t current_receiveID;
 
-#if (LOCODECK_NR_OF_TWR_ANCHORS + 1) > 2
+#if (MAX_SWARM_SIZE > 2)
 static bool checkTurn;
 static uint32_t checkTurnTick = 0;
 #endif
@@ -126,7 +128,7 @@ typedef struct
   uint16_t distance_history[3];
   uint8_t index_inserting;
 } median_data_t;
-static median_data_t median_data[LOCODECK_NR_OF_TWR_ANCHORS + 1];
+static median_data_t median_data[MAX_SWARM_SIZE];
 
 static uint16_t median_filter_3(uint16_t *data)
 {
@@ -163,7 +165,7 @@ static void txcallback(dwDevice_t *dev)
       final_tx = departure;
       break;
     case LPS_TWR_REPORT + 1:
-#if (LOCODECK_NR_OF_TWR_ANCHORS + 1) > 2
+#if (MAX_SWARM_SIZE > 2)
       if ((current_receiveID == 0) || (current_receiveID - 1 == selfID))
       {
         // current_receiveID = current_receiveID;
@@ -220,7 +222,7 @@ static void rxcallback(dwDevice_t *dev) {
   if (rxPacket.destAddress != selfAddress) {
     if (current_mode_trans)
     {
-#if (LOCODECK_NR_OF_TWR_ANCHORS + 1) > 2
+#if (MAX_SWARM_SIZE > 2)
       current_mode_trans = false;
 #endif
       dwIdle(dev);
@@ -274,7 +276,8 @@ static void rxcallback(dwDevice_t *dev) {
 
       tprop = tprop_ctn / LOCODECK_TS_FREQ;
       uint16_t calcDist = (uint16_t)(1000 * SPEED_OF_LIGHT * tprop);
-      if (calcDist != 0)
+      uint8_t n = effectiveSwarmSize();
+      if (calcDist != 0 && current_receiveID < n)
       {
         uint16_t medianDist = median_filter_3(median_data[current_receiveID].distance_history);
         if (ABS(medianDist - calcDist) > 500)
@@ -294,7 +297,6 @@ static void rxcallback(dwDevice_t *dev) {
           state.keep_flying = report->keep_flying;
         state.refresh[current_receiveID] = true;
 
-        // DEBUG_PRINT("Received reciprocal distance measurement from ID %d: %u mm from pos (%.2f, %.2f, %.2f)\n", current_receiveID, calcDist, (double)state.x[current_receiveID], (double)state.y[current_receiveID], (double)state.h[current_receiveID]);
         if (isAnchor == 0)
         {
           distanceMeasurement_t dist;
@@ -304,6 +306,7 @@ static void rxcallback(dwDevice_t *dev) {
           dist.z = state.h[current_receiveID];
           dist.anchorId = current_receiveID;
           dist.stdDev = 0.3; // Make this depend on type of other crazyflie
+          // DEBUG_PRINT("Tag got distance to Anchor %u: %.2f m\n", current_receiveID, (double)dist.distance);
           estimatorEnqueueDistance(&dist);
         }
       }
@@ -388,8 +391,9 @@ static void rxcallback(dwDevice_t *dev) {
     case (LPS_TWR_REPORT + 1):
     {
       lpsTwrTagReportPayload_t *report2 = (lpsTwrTagReportPayload_t *)(rxPacket.payload + 2);
-      uint8_t rangingID = (uint8_t)(rxPacket.sourceAddress & 0xFF);
-      if ((report2->reciprocalDistance) != 0)
+  uint8_t rangingID = (uint8_t)(rxPacket.sourceAddress & 0xFF);
+  uint8_t n = effectiveSwarmSize();
+  if ((report2->reciprocalDistance) != 0 && rangingID < n)
       {
         // received distance has large noise
         uint16_t calcDist = report2->reciprocalDistance;
@@ -421,23 +425,25 @@ static void rxcallback(dwDevice_t *dev) {
           dist.z = state.h[rangingID];
           dist.anchorId = rangingID;
           dist.stdDev = 0.25; // Make this depend on type of other crazyflie
+          // DEBUG_PRINT("Tag got distance to Anchor %u: %.2f m\n", rangingID, (double)dist.distance);
           estimatorEnqueueDistance(&dist);
         }
       }
       rangingOk = true;
-#if (LOCODECK_NR_OF_TWR_ANCHORS + 1) > 2
+#if (MAX_SWARM_SIZE > 2)
       uint8_t fromID = (uint8_t)(rxPacket.sourceAddress & 0xFF);
       if (selfID == fromID + 1 || selfID == 0)
       {
         current_mode_trans = true;
         dwIdle(dev);
-        dwSetReceiveWaitTimeout(dev, 3000);
-        if (selfID == LOCODECK_NR_OF_TWR_ANCHORS)
+        dwSetReceiveWaitTimeout(dev, 1000);
+        uint8_t lastId = (effectiveSwarmSize() > 0) ? (uint8_t)(effectiveSwarmSize() - 1) : 0;
+        if (selfID == lastId)
           current_receiveID = 0;
         else
-          current_receiveID = LOCODECK_NR_OF_TWR_ANCHORS;
+          current_receiveID = lastId;
         if (selfID == 0)
-          current_receiveID = LOCODECK_NR_OF_TWR_ANCHORS - 1; // immediate problem
+          current_receiveID = (lastId > 0) ? (uint8_t)(lastId - 1) : 0; // previous in ring
         txPacket.payload[LPS_TWR_TYPE] = LPS_TWR_POLL;
         txPacket.payload[LPS_TWR_SEQ] = 0;
         txPacket.sourceAddress = selfAddress;
@@ -454,7 +460,7 @@ static void rxcallback(dwDevice_t *dev) {
         dwNewReceive(dev);
         dwSetDefaults(dev);
         dwStartReceive(dev);
-#if (LOCODECK_NR_OF_TWR_ANCHORS + 1) > 2
+#if (MAX_SWARM_SIZE > 2)
       }
 #endif
       break;
@@ -472,7 +478,7 @@ static uint32_t twrTagOnEvent(dwDevice_t *dev, uwbEvent_t event)
   switch(event) {
     case eventPacketReceived:
       rxcallback(dev);
-#if (LOCODECK_NR_OF_TWR_ANCHORS + 1) > 2
+#if (MAX_SWARM_SIZE > 2)
       checkTurn = false;
 #endif
       break;
@@ -496,14 +502,14 @@ static uint32_t twrTagOnEvent(dwDevice_t *dev, uwbEvent_t event)
       }
       else
       {
-#if (LOCODECK_NR_OF_TWR_ANCHORS + 1) > 2
+#if (MAX_SWARM_SIZE > 2)
         if (xTaskGetTickCount() > checkTurnTick + 20) // > 20ms
         {
           if (checkTurn == true)
           {
             current_mode_trans = true;
             dwIdle(dev);
-            dwSetReceiveWaitTimeout(dev, 3000);
+            dwSetReceiveWaitTimeout(dev, 1000);
             txPacket.payload[LPS_TWR_TYPE] = LPS_TWR_POLL;
             txPacket.payload[LPS_TWR_SEQ] = 0;
             txPacket.sourceAddress = selfAddress;
@@ -550,9 +556,9 @@ static void twrTagInit(dwDevice_t *dev)
   // Communication logic between each UWB
   if (selfID == 0)
   {
-    current_receiveID = (LOCODECK_NR_OF_TWR_ANCHORS + 1) - 1;
+  current_receiveID = (uint8_t)(effectiveSwarmSize() - 1);
     current_mode_trans = true;
-    dwSetReceiveWaitTimeout(dev, 3000);
+    dwSetReceiveWaitTimeout(dev, 1000);
   }
   else
   {
@@ -561,7 +567,7 @@ static void twrTagInit(dwDevice_t *dev)
     dwSetReceiveWaitTimeout(dev, TWR_RECEIVE_TIMEOUT);
   }
 
-  for (int i = 0; i < (LOCODECK_NR_OF_TWR_ANCHORS + 1); i++)
+  for (int i = 0; i < MAX_SWARM_SIZE; i++)
   {
     median_data[i].index_inserting = 0;
     state.refresh[i] = false;
@@ -570,7 +576,7 @@ static void twrTagInit(dwDevice_t *dev)
   state.keep_flying = false;
 
   DEBUG_PRINT("twrtag initialized with ID: %d\n", selfID);
-#if (LOCODECK_NR_OF_TWR_ANCHORS + 1) > 2
+#if (MAX_SWARM_SIZE > 2)
   checkTurn = false;
 #endif
   rangingOk = false;
@@ -622,6 +628,10 @@ static uint8_t getActiveAnchorIdList(uint8_t unorderedAnchorList[], const int ma
 bool twrGetSwarmInfo(int robNum, uint16_t *range, float *x, float *y, float *gyroZ, float *height)
 {
   // DEBUG_PRINT("twrGetSwarmInfo called for robot %d\n", robNum);
+  uint8_t n = effectiveSwarmSize();
+  if ((robNum < 0) || ((uint8_t)robNum >= n)) {
+    return false;
+  }
   if (state.refresh[robNum] == true)
   {
     state.refresh[robNum] = false;

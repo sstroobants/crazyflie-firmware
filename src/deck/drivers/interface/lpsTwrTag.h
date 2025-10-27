@@ -12,7 +12,7 @@
 
 #define LPS_TWR_TYPE 0
 #define LPS_TWR_SEQ 1
-#define LOCODECK_NR_OF_TWR_ANCHORS 2 // Number of other UWB devices used in the swarm
+#define LOCODECK_NR_OF_TWR_ANCHORS 9 // Number of other UWB devices used in the swarm
 
 extern uwbAlgorithm_t uwbTwrTagAlgorithm;
 
