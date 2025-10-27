@@ -503,10 +503,10 @@ static void rxcallback(dwDevice_t *dev) {
       // This makes the protocol more robust to individual crazyflie failures
       
       // Randomly decide whether to initiate next ranging (distributed approach)
-      // Use a probability-based approach: each crazyflie has a 1/swarmSize chance
-      // This ensures communication continues even if some crazyflies are inactive
+      // Use a probability-based approach: each crazyflie has roughly 2/swarmSize chance
+      // This ensures enough communication activity while avoiding excessive collisions
       uint32_t tick = xTaskGetTickCount();
-      bool shouldInitiate = ((tick + selfID) % swarmSize) < 2; // Roughly 2/swarmSize chance
+      bool shouldInitiate = ((tick + selfID) % swarmSize) < 2;
       
       if (shouldInitiate)
       {

@@ -33,8 +33,10 @@ Enhanced timeout handling to automatically switch to different peers:
 ### 4. Distributed Initiation
 Instead of the fixed ring protocol where only specific crazyflies could initiate ranging, the new implementation uses a distributed approach:
 - After receiving a ranging report, each crazyflie randomly decides whether to initiate the next ranging
-- Decision is based on: `(tick % swarmSize) == selfID`
-- This ensures roughly equal distribution of ranging initiation across the swarm
+- Decision is based on: `((tick + selfID) % swarmSize) < 2`
+- This gives each crazyflie roughly a 2/swarmSize probability of initiating
+- This ensures enough communication activity while avoiding excessive collisions
+- The offset by selfID ensures crazyflies don't all make the same decision at the same tick
 
 ## Key Changes by Location
 
