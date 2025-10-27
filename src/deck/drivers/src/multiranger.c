@@ -135,7 +135,7 @@ static void mrTask(void *param)
 
     while (1)
     {
-        vTaskDelayUntil(&lastWakeTime, M2T(100));
+        vTaskDelayUntil(&lastWakeTime, M2T(200));
         rangeSet(rangeFront, mrGetMeasurementAndRestart(&devFront) / 1000.0f);
         rangeSet(rangeBack, mrGetMeasurementAndRestart(&devBack) / 1000.0f);
         rangeSet(rangeUp, mrGetMeasurementAndRestart(&devUp) / 1000.0f);

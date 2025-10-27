@@ -271,6 +271,9 @@ static void kalmanTask(void* parameters) {
           lastGroundPoseMeasurement.quat.z = coreData.q[3];
 
           wasArmedLastCheck = false;
+          DEBUG_PRINT("Storing last ground pose measurement\n");
+          DEBUG_PRINT("  pos: %.2f, %.2f, %.2f\n", (double)lastGroundPoseMeasurement.x, (double)lastGroundPoseMeasurement.y, (double)lastGroundPoseMeasurement.z);
+          DEBUG_PRINT("  quat: %.2f, %.2f, %.2f, %.2f\n", (double)lastGroundPoseMeasurement.quat.w, (double)lastGroundPoseMeasurement.quat.x, (double)lastGroundPoseMeasurement.quat.y, (double)lastGroundPoseMeasurement.quat.z);
         }
         poseMeasurement_t poseMeas;
         poseMeas.x = lastGroundPoseMeasurement.x;

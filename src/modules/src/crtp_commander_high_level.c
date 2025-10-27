@@ -58,6 +58,9 @@ such as: take-off, landing, polynomial trajectories.
 #include "stabilizer_types.h"
 #include "stabilizer.h"
 
+#define DEBUG_MODULE "HL_OA"
+#include "debug.h"
+
 // Local types
 enum TrajectoryLocation_e {
   TRAJECTORY_LOCATION_INVALID = 0,
@@ -111,6 +114,168 @@ static StaticSemaphore_t lockTrajBuffer;
 // safe default settings for takeoff and landing velocity
 static float defaultTakeoffVelocity = 0.5f;
 static float defaultLandingVelocity = 0.5f;
+
+// ---- Obstacle avoidance (OA) state/params ----
+static uint8_t oaEnabled = 1;          // PARAM: oa.enabled
+static uint16_t oaStop_mm = 300;       // PARAM: oa.stop_mm
+static float oaSidestep_m = 0.25f;     // PARAM: oa.sidestep_m
+static float oaGoalTol_m = 0.05f;      // PARAM: oa.tol_m
+
+static logVarId_t oaIdFront, oaIdBack, oaIdLeft, oaIdRight;
+
+// Direction logging variables
+static uint8_t oaLogDirAxis = 0;   // 0: none, 1: X (forward/back), 2: Y (left/right)
+static int8_t  oaLogDirSign = 0;   // -1, 0, +1
+static float   oaLogDirDX = 0.0f;  // normalized desired direction X component
+static float   oaLogDirDY = 0.0f;  // normalized desired direction Y component
+
+enum oa_mode_e { OA_IDLE = 0, OA_SIDESTEP = 1 };
+
+static struct {
+  bool active;            // true if last command was go_to/go_to_2
+  struct vec goalPos;     // absolute goal (m)
+  float goalYaw;          // yaw (rad)
+  enum oa_mode_e mode;    // current OA sub-state
+  struct vec sidestepTarget;  // absolute target for sidestep
+} oaCtx = {0};
+
+// Read a ranger distance safely, returns UINT16_MAX if invalid
+static inline uint16_t oaReadRange(logVarId_t id) {
+  if (id == 0) return UINT16_MAX;
+  return logGetUint(id);
+}
+
+static void oaInitSensors()
+{
+  // Acquire Multiranger log IDs (optional if deck not present)
+  oaIdFront = logGetVarId("range", "front");
+  oaIdBack  = logGetVarId("range", "back");
+  oaIdLeft  = logGetVarId("range", "left");
+  oaIdRight = logGetVarId("range", "right");
+}
+
+// Decide if we are mainly moving along X (forward/back) or Y (left/right)
+static inline bool oaIsMainlyX(const struct vec from, const struct vec to) {
+  const float dx = to.x - from.x;
+  const float dy = to.y - from.y;
+  return fabsf(dx) >= fabsf(dy);
+}
+
+static void oaRecordGoal(const struct vec absGoalPos, const float goalYawRad)
+{
+  oaCtx.active = true;
+  oaCtx.goalPos = absGoalPos;
+  oaCtx.goalYaw = goalYawRad;
+  oaCtx.mode = OA_IDLE;
+}
+
+// Try to replan a sidestep if obstacle is too close in the motion direction
+static void oaMaybeReplanSidestep()
+{
+  if (!oaEnabled || !oaCtx.active) {
+    // No active goal -> zero out direction logs
+    oaLogDirAxis = 0;
+    oaLogDirSign = 0;
+    oaLogDirDX = 0.0f;
+    oaLogDirDY = 0.0f;
+    return;
+  }
+
+  // If already sidestepping, check completion and resume to original goal
+  if (oaCtx.mode == OA_SIDESTEP) {
+    const float dx = oaCtx.sidestepTarget.x - pos.x;
+    const float dy = oaCtx.sidestepTarget.y - pos.y;
+    const float dist = sqrtf(dx*dx + dy*dy);
+
+    // Update direction logs for sidestep
+    const float n = fmaxf(sqrtf(dx*dx + dy*dy), 1e-6f);
+    oaLogDirDX = dx / n;
+    oaLogDirDY = dy / n;
+    oaLogDirAxis = (fabsf(dx) >= fabsf(dy)) ? 1 : 2;
+    oaLogDirSign = (oaLogDirAxis == 1) ? (dx >= 0.0f ? 1 : -1) : (dy >= 0.0f ? 1 : -1);
+
+    if (dist <= oaGoalTol_m) {
+      // Resume towards original goal
+      xSemaphoreTake(lockTraj, portMAX_DELAY);
+      float t = usecTimestamp() / 1e6f;
+
+      const float remDx = oaCtx.goalPos.x - pos.x;
+      const float remDy = oaCtx.goalPos.y - pos.y;
+      const float remDz = oaCtx.goalPos.z - pos.z;
+      const float remDist = sqrtf(remDx*remDx + remDy*remDy + remDz*remDz);
+      const float speed = 0.3f; // m/s nominal
+      const float duration = fmaxf(remDist / speed, 1.0f);
+
+      // linear = false for smooth final approach
+      (void)plan_go_to(&planner, /*relative*/false, /*linear*/false, oaCtx.goalPos, oaCtx.goalYaw, duration, t);
+      xSemaphoreGive(lockTraj);
+      oaCtx.mode = OA_IDLE;
+    }
+    return;
+  }
+
+  // If not sidestepping, compute goal direction and log it
+  const float gdx = oaCtx.goalPos.x - pos.x;
+  const float gdy = oaCtx.goalPos.y - pos.y;
+  const float gn = fmaxf(sqrtf(gdx*gdx + gdy*gdy), 1e-6f);
+  oaLogDirDX = gdx / gn;
+  oaLogDirDY = gdy / gn;
+  const bool alongX = oaIsMainlyX(pos, oaCtx.goalPos);
+  oaLogDirAxis = alongX ? 1 : 2;
+  oaLogDirSign = alongX ? (gdx >= 0.0f ? 1 : -1) : (gdy >= 0.0f ? 1 : -1);
+
+  // If not sidestepping, check for obstacle along motion direction
+  if (alongX) {
+    const float dir = (oaCtx.goalPos.x - pos.x) >= 0.0f ? 1.0f : -1.0f;
+    const uint16_t dForward = dir > 0 ? oaReadRange(oaIdFront) : oaReadRange(oaIdBack);
+    // DEBUG_PRINT("OA: dForward=%u mm\n", dForward);
+    if (dForward != UINT16_MAX && dForward > 0 && dForward < oaStop_mm) {
+      // Choose lateral sidestep toward side with more clearance
+      const uint16_t dLeft = oaReadRange(oaIdLeft);
+      const uint16_t dRight = oaReadRange(oaIdRight);
+      const float sideSign = (dLeft >= dRight) ? 1.0f : -1.0f; // +Y is left, -Y is right
+
+      const float dy = sideSign * oaSidestep_m;
+      const struct vec relStep = mkvec(0.0f, dy, 0.0f);
+
+      xSemaphoreTake(lockTraj, portMAX_DELAY);
+      float t = usecTimestamp() / 1e6f;
+      const float speed = 0.4f; // m/s sideways
+      const float duration = fmaxf(fabsf(dy) / speed, 0.6f);
+      // Plan a short, linear, relative sidestep at constant Z and current yaw
+      (void)plan_go_to(&planner, /*relative*/true, /*linear*/true, relStep, yaw, duration, t);
+      xSemaphoreGive(lockTraj);
+
+      oaCtx.mode = OA_SIDESTEP;
+      oaCtx.sidestepTarget = mkvec(pos.x, pos.y + dy, pos.z);
+      DEBUG_PRINT("OA: sidestep X=%.2f, Y=%.2f m (front/back=%u mm)\n", (double)oaCtx.sidestepTarget.x, (double)oaCtx.sidestepTarget.y, dForward);
+    }
+  } else {
+    const float dir = (oaCtx.goalPos.y - pos.y) >= 0.0f ? 1.0f : -1.0f; // +Y: left, -Y: right
+    const uint16_t dSide = dir > 0 ? oaReadRange(oaIdLeft) : oaReadRange(oaIdRight);
+    // DEBUG_PRINT("OA: dSide=%u mm\n", dSide);
+    if (dSide != UINT16_MAX && dSide > 0 && dSide < oaStop_mm) {
+      // Choose forward/back sidestep toward side with more clearance
+      const uint16_t dFront = oaReadRange(oaIdFront);
+      const uint16_t dBack = oaReadRange(oaIdBack);
+      const float xSign = (dBack >= dFront) ? 1.0f : -1.0f; // +X forward, -X backward
+
+      const float dx = xSign * oaSidestep_m;
+      const struct vec relStep = mkvec(dx, 0.0f, 0.0f);
+
+      xSemaphoreTake(lockTraj, portMAX_DELAY);
+      float t = usecTimestamp() / 1e6f;
+      const float speed = 0.3f; // m/s forward/back
+      const float duration = fmaxf(fabsf(dx) / speed, 0.8f);
+      (void)plan_go_to(&planner, /*relative*/true, /*linear*/true, relStep, yaw, duration, t);
+      xSemaphoreGive(lockTraj);
+
+      oaCtx.mode = OA_SIDESTEP;
+      oaCtx.sidestepTarget = mkvec(pos.x + dx, pos.y, pos.z);
+      DEBUG_PRINT("OA: sidestep X=%.2f m (left/right=%u mm)\n", (double)dx, dSide);
+    }
+  }
+}
 
 // Trajectory memory handling from the memory module
 static uint32_t handleMemGetSize(void) { return crtpCommanderHighLevelTrajectoryMemSize(); }
@@ -319,6 +484,9 @@ void crtpCommanderHighLevelInit(void)
 
   isBlocked = false;
 
+  // Add: initialize OA sensor log IDs
+  oaInitSensors();
+
   isInit = true;
 }
 
@@ -401,6 +569,11 @@ bool crtpCommanderHighLevelGetSetpoint(setpoint_t* setpoint, const state_t *stat
     pos = ev.pos;
     vel = ev.vel;
     yaw = ev.yaw;
+
+    // Add: run OA replanning logic if we're in the air
+    if (state->position.z > 0.5f) {
+      oaMaybeReplanSidestep();
+    }
 
     return true;
   }
@@ -634,6 +807,8 @@ int stop(const struct data_stop* data)
     xSemaphoreTake(lockTraj, portMAX_DELAY);
     plan_stop(&planner);
     xSemaphoreGive(lockTraj);
+    oaCtx.active = false;
+    oaCtx.mode = OA_IDLE;
   }
   return result;
 }
@@ -665,6 +840,14 @@ int go_to(const struct data_go_to* data)
       result = plan_go_to(&planner, data->relative, false, hover_pos, data->yaw, data->duration, t);
     }
     xSemaphoreGive(lockTraj);
+
+    // Record absolute goal for OA
+    struct vec goalAbs = hover_pos;
+    if (data->relative) {
+      goalAbs = mkvec(pos.x + hover_pos.x, pos.y + hover_pos.y, pos.z + hover_pos.z);
+    }
+    const float goalYawRad = data->yaw; // data->relative yaw is handled in planner, we keep target value
+    oaRecordGoal(goalAbs, goalYawRad);
   }
   return result;
 }
@@ -696,6 +879,14 @@ int go_to2(const struct data_go_to_2* data)
       result = plan_go_to(&planner, data->relative, data->linear, hover_pos, data->yaw, data->duration, t);
     }
     xSemaphoreGive(lockTraj);
+
+    // Record absolute goal for OA
+    struct vec goalAbs = hover_pos;
+    if (data->relative) {
+      goalAbs = mkvec(pos.x + hover_pos.x, pos.y + hover_pos.y, pos.z + hover_pos.z);
+    }
+    const float goalYawRad = data->yaw;
+    oaRecordGoal(goalAbs, goalYawRad);
   }
   return result;
 }
@@ -1103,3 +1294,38 @@ PARAM_ADD_CORE(PARAM_FLOAT, vland, &defaultLandingVelocity)
 PARAM_ADD_CORE(PARAM_UINT8, groupmask, &group_mask)
 
 PARAM_GROUP_STOP(hlCommander)
+
+// Add: Obstacle avoidance parameters
+PARAM_GROUP_START(oa)
+/**
+ * @brief Enable/disable obstacle avoidance for go_to
+ */
+PARAM_ADD_CORE(PARAM_UINT8 | PARAM_PERSISTENT, enabled, &oaEnabled)
+/**
+ * @brief Stop/replan threshold (mm) in moving direction
+ */
+PARAM_ADD_CORE(PARAM_UINT16 | PARAM_PERSISTENT, stop_mm, &oaStop_mm)
+/**
+ * @brief Sidestep distance (m) when blocked
+ */
+PARAM_ADD_CORE(PARAM_FLOAT | PARAM_PERSISTENT, sidestep_m, &oaSidestep_m)
+/**
+ * @brief Position tolerance (m) to consider sidestep reached
+ */
+PARAM_ADD_CORE(PARAM_FLOAT | PARAM_PERSISTENT, tol_m, &oaGoalTol_m)
+PARAM_GROUP_STOP(oa)
+
+LOG_GROUP_START(oa)
+/**
+ * @brief Obstacle avoidance mode
+ */
+LOG_ADD_CORE(LOG_UINT8, mode, &oaCtx.mode)
+/** @brief Obstacle avoidance active
+ */
+LOG_ADD_CORE(LOG_UINT8, active, &oaCtx.active)
+// Direction diagnostics
+LOG_ADD_CORE(LOG_UINT8, dirAxis, &oaLogDirAxis)
+LOG_ADD_CORE(LOG_INT8,  dirSign, &oaLogDirSign)
+LOG_ADD_CORE(LOG_FLOAT, dirDX,   &oaLogDirDX)
+LOG_ADD_CORE(LOG_FLOAT, dirDY,   &oaLogDirDY)
+LOG_GROUP_STOP(oa)
