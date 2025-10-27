@@ -120,6 +120,12 @@ static bool checkTurn;
 static uint32_t checkTurnTick = 0;
 #endif
 
+// Timeout and peer tracking for robust communication
+static uint32_t lastSuccessfulRanging[LOCODECK_NR_OF_TWR_ANCHORS + 1];
+static uint32_t consecutiveTimeouts = 0;
+#define MAX_CONSECUTIVE_TIMEOUTS 3
+#define PEER_TIMEOUT_MS 5000  // Consider peer inactive after 5 seconds
+
 // Median filter for distance ranging (size=3)
 typedef struct
 {
@@ -146,6 +152,64 @@ static uint16_t median_filter_3(uint16_t *data)
   return middle;
 }
 #define ABS(a) ((a) > 0 ? (a) : -(a))
+
+// Helper function to select a random peer from the swarm (excluding self)
+static uint8_t selectRandomPeer(void)
+{
+  // Use xTaskGetTickCount as a simple random seed
+  uint32_t tick = xTaskGetTickCount();
+  uint8_t numPeers = swarmSize - 1; // Exclude self
+  
+  if (numPeers == 0) {
+    return selfID; // No peers available
+  }
+  
+  // Simple random selection based on tick count
+  uint8_t peerIndex = tick % numPeers;
+  uint8_t selectedPeer = peerIndex;
+  
+  // Skip self ID
+  if (selectedPeer >= selfID) {
+    selectedPeer++;
+  }
+  
+  return selectedPeer;
+}
+
+// Helper function to check if a peer is active (has responded recently)
+static bool isPeerActive(uint8_t peerID)
+{
+  uint32_t currentTick = xTaskGetTickCount();
+  uint32_t timeSinceLastRanging = currentTick - lastSuccessfulRanging[peerID];
+  
+  // Convert ticks to ms (assuming 1 tick = 1 ms, which is typical for FreeRTOS)
+  return timeSinceLastRanging < PEER_TIMEOUT_MS;
+}
+
+// Helper function to select next peer to communicate with
+// Prefers random active peers, falls back to any peer if none are active
+static uint8_t selectNextPeer(void)
+{
+  uint8_t activePeers[LOCODECK_NR_OF_TWR_ANCHORS + 1];
+  uint8_t activeCount = 0;
+  
+  // Collect active peers
+  for (uint8_t i = 0; i < swarmSize; i++) {
+    if (i != selfID && isPeerActive(i)) {
+      activePeers[activeCount++] = i;
+    }
+  }
+  
+  // If we have active peers, select randomly from them
+  if (activeCount > 0) {
+    uint32_t tick = xTaskGetTickCount();
+    uint8_t index = tick % activeCount;
+    return activePeers[index];
+  }
+  
+  // No active peers, select any random peer (excluding self)
+  return selectRandomPeer();
+}
 
 static void txcallback(dwDevice_t *dev)
 {
@@ -286,6 +350,11 @@ static void rxcallback(dwDevice_t *dev) {
           median_data[current_receiveID].index_inserting = 0;
         median_data[current_receiveID].distance_history[median_data[current_receiveID].index_inserting] = calcDist;
         rangingOk = true;
+        
+        // Update last successful ranging timestamp
+        lastSuccessfulRanging[current_receiveID] = xTaskGetTickCount();
+        consecutiveTimeouts = 0; // Reset timeout counter on successful ranging
+        
         state.x[current_receiveID] = report->selfX;
         state.y[current_receiveID] = report->selfY;
         state.gz[current_receiveID] = report->selfGz;
@@ -425,19 +494,27 @@ static void rxcallback(dwDevice_t *dev) {
         }
       }
       rangingOk = true;
+      // Update last successful ranging timestamp
+      lastSuccessfulRanging[rangingID] = xTaskGetTickCount();
+      consecutiveTimeouts = 0; // Reset timeout counter on successful ranging
+      
 #if (LOCODECK_NR_OF_TWR_ANCHORS + 1) > 2
-      uint8_t fromID = (uint8_t)(rxPacket.sourceAddress & 0xFF);
-      if (selfID == fromID + 1 || selfID == 0)
+      // Instead of fixed ring protocol, use random peer selection
+      // This makes the protocol more robust to individual crazyflie failures
+      
+      // Randomly decide whether to initiate next ranging (distributed approach)
+      uint32_t tick = xTaskGetTickCount();
+      uint8_t shouldInitiate = (tick % swarmSize) == selfID;
+      
+      if (shouldInitiate)
       {
         current_mode_trans = true;
         dwIdle(dev);
         dwSetReceiveWaitTimeout(dev, 3000);
-        if (selfID == LOCODECK_NR_OF_TWR_ANCHORS)
-          current_receiveID = 0;
-        else
-          current_receiveID = LOCODECK_NR_OF_TWR_ANCHORS;
-        if (selfID == 0)
-          current_receiveID = LOCODECK_NR_OF_TWR_ANCHORS - 1; // immediate problem
+        
+        // Select a random peer to communicate with
+        current_receiveID = selectNextPeer();
+        
         txPacket.payload[LPS_TWR_TYPE] = LPS_TWR_POLL;
         txPacket.payload[LPS_TWR_SEQ] = 0;
         txPacket.sourceAddress = selfAddress;
@@ -484,6 +561,14 @@ static uint32_t twrTagOnEvent(dwDevice_t *dev, uwbEvent_t event)
     case eventReceiveFailed:
       if (current_mode_trans == true)
       {
+        consecutiveTimeouts++;
+        
+        // If we've had too many timeouts with current peer, try a different one
+        if (consecutiveTimeouts >= MAX_CONSECUTIVE_TIMEOUTS) {
+          current_receiveID = selectNextPeer();
+          consecutiveTimeouts = 0;
+        }
+        
         txPacket.payload[LPS_TWR_TYPE] = LPS_TWR_POLL;
         txPacket.payload[LPS_TWR_SEQ] = 0;
         txPacket.sourceAddress = selfAddress;
@@ -504,6 +589,11 @@ static uint32_t twrTagOnEvent(dwDevice_t *dev, uwbEvent_t event)
             current_mode_trans = true;
             dwIdle(dev);
             dwSetReceiveWaitTimeout(dev, 3000);
+            
+            // Select a random peer to communicate with
+            current_receiveID = selectNextPeer();
+            consecutiveTimeouts = 0;
+            
             txPacket.payload[LPS_TWR_TYPE] = LPS_TWR_POLL;
             txPacket.payload[LPS_TWR_SEQ] = 0;
             txPacket.sourceAddress = selfAddress;
@@ -547,16 +637,25 @@ static void twrTagInit(dwDevice_t *dev)
   selfID = (uint8_t)(configblockGetRadioAddress() & 0xF);
   selfAddress = basicAddr + selfID;
 
+  // Initialize peer activity tracking
+  uint32_t currentTick = xTaskGetTickCount();
+  for (int i = 0; i < (LOCODECK_NR_OF_TWR_ANCHORS + 1); i++)
+  {
+    lastSuccessfulRanging[i] = currentTick;
+  }
+  consecutiveTimeouts = 0;
+
   // Communication logic between each UWB
+  // Use random initial peer selection for more robust startup
   if (selfID == 0)
   {
-    current_receiveID = (LOCODECK_NR_OF_TWR_ANCHORS + 1) - 1;
+    current_receiveID = selectRandomPeer();
     current_mode_trans = true;
     dwSetReceiveWaitTimeout(dev, 3000);
   }
   else
   {
-    // current_receiveID = 0;
+    current_receiveID = selectRandomPeer();
     current_mode_trans = false;
     dwSetReceiveWaitTimeout(dev, TWR_RECEIVE_TIMEOUT);
   }
