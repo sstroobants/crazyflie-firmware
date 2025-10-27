@@ -26,6 +26,7 @@
 #include <string.h>
 #include "lpsTwrTag.h"
 #include "log.h"
+#include "param.h"
 #include "physicalConstants.h"
 #include "FreeRTOS.h"
 #include "task.h"
@@ -44,6 +45,9 @@
 static uint8_t selfID;
 static locoAddress_t selfAddress;
 // static const uint64_t antennaDelay = (ANTENNA_OFFSET * 499.2e6 * 128) / 299792458.0; // In radio tick
+
+// Swarm size: total number of crazyflies in the swarm (including self)
+static const uint8_t swarmSize = LOCODECK_NR_OF_TWR_ANCHORS + 1;
 
 // Config
 static lpsTwrAlgoOptions_t defaultOptions = {
@@ -663,3 +667,10 @@ LOG_ADD(LOG_UINT16, distance2, &state.distance[2])
 LOG_ADD(LOG_UINT16, distance3, &state.distance[3])
 LOG_ADD(LOG_UINT16, distance4, &state.distance[4])
 LOG_GROUP_STOP(ranging)
+
+PARAM_GROUP_START(swarm)
+/**
+ * @brief Number of crazyflies in the swarm (including self)
+ */
+PARAM_ADD(PARAM_UINT8 | PARAM_RONLY, size, &swarmSize)
+PARAM_GROUP_STOP(swarm)
