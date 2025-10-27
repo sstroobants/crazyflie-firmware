@@ -326,6 +326,20 @@ void testThatWhenARangingHasHappenRangingIsReportedToBeOk() {
   TEST_ASSERT_TRUE(uwbTwrTagAlgorithm.isRangingOk());
 }
 
+void testGetActiveAnchorListReturnsAllAnchorsInitially() {
+  // Fixture
+  uint8_t anchorList[LOCODECK_NR_OF_TWR_ANCHORS];
+  
+  // Test - initially all anchors should be active (no failures yet)
+  uint8_t count = uwbTwrTagAlgorithm.getActiveAnchorIdList(anchorList, LOCODECK_NR_OF_TWR_ANCHORS);
+  
+  // Assert - should have all anchors initially
+  TEST_ASSERT_EQUAL_UINT8(LOCODECK_NR_OF_TWR_ANCHORS, count);
+  for (int i = 0; i < LOCODECK_NR_OF_TWR_ANCHORS; i++) {
+    TEST_ASSERT_EQUAL_UINT8(i, anchorList[i]);
+  }
+}
+
 
 ///////////////////////////////////////////////////////////////////////////////
 
