@@ -102,7 +102,8 @@
 #define CRTP_SRV_TASK_PRI         0
 #define PLATFORM_SRV_TASK_PRI     0
 // #define RELATIVE_LOC_TASK_PRI     3
-#define TEENSY_TASK_PRI      3
+#define TEENSY_TASK_PRI           3
+#define SWITCH_TASK_PRI           2
 
 // Not compiled
 #if 0
@@ -164,6 +165,7 @@
 #define FLAPPERDECK_TASK_NAME     "FLAPPERDECK"
 // #define RELATIVE_LOC_TASK_NAME    "REL-LOC"
 #define TEENSY_TASK_NAME          "TEENSY"
+#define SWITCH_TASK_NAME          "SWITCH"
 
 //Task stack sizes
 #define SYSTEM_TASK_STACKSIZE           (2* configMINIMAL_STACK_SIZE)
@@ -212,6 +214,7 @@
 #define ERROR_UKF_TASK_STACKSIZE        (4 * configMINIMAL_STACK_SIZE)
 // #define RELATIVE_LOC_TASK_STACKSIZE     (2 * configMINIMAL_STACK_SIZE)
 #define TEENSY_TASK_STACKSIZE           (4 * configMINIMAL_STACK_SIZE)
+#define SWITCH_TASK_STACKSIZE          configMINIMAL_STACK_SIZE
 
 //The radio channel. From 0 to 125
 #define RADIO_CHANNEL 80
