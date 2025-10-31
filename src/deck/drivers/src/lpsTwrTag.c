@@ -143,6 +143,24 @@ typedef struct
 } median_data_t;
 static median_data_t median_data[MAX_SWARM_SIZE];
 
+// Ranging rate debug tracking
+static uint32_t lastRateTick = 0;
+static uint32_t successfulRangeCount = 0;
+
+static inline void noteSuccessfulRange(void)
+{
+  successfulRangeCount++;
+  uint32_t now = xTaskGetTickCount();
+  uint32_t elapsed = now - lastRateTick; // ticks are ~ms
+  if (elapsed >= 1000) { // ~1 second window
+    float rate = (elapsed > 0) ? (successfulRangeCount * 1000.0f) / (float)elapsed : 0.0f;
+    DEBUG_PRINT("TWR Tag ID %u: ranging rate %.1f Hz (%lu events in %lu ms)\n",
+                selfID, (double)rate, (unsigned long)successfulRangeCount, (unsigned long)elapsed);
+    successfulRangeCount = 0;
+    lastRateTick = now;
+  }
+}
+
 static uint16_t median_filter_3(uint16_t *data)
 {
   uint16_t middle;
@@ -301,9 +319,9 @@ static void rxcallback(dwDevice_t *dev) {
   if (rxPacket.destAddress != selfAddress) {
     if (current_mode_trans)
     {
-#if (MAX_SWARM_SIZE > 2)
+// #if (MAX_SWARM_SIZE > 2)
       current_mode_trans = false;
-#endif
+// #endif
       dwIdle(dev);
       dwSetReceiveWaitTimeout(dev, 10000);
     }
@@ -393,6 +411,9 @@ static void rxcallback(dwDevice_t *dev) {
           // DEBUG_PRINT("Tag got distance to Anchor %u: %.2f m\n", current_receiveID, (double)dist.distance);
           estimatorEnqueueDistance(&dist);
         }
+
+      // Count successful ranging for rate debug
+      noteSuccessfulRange();
       }
 
       lpsTwrTagReportPayload_t *report2 = (lpsTwrTagReportPayload_t *)(txPacket.payload + 2);
@@ -517,6 +538,9 @@ static void rxcallback(dwDevice_t *dev) {
         lastSuccessfulRanging[rangingID] = xTaskGetTickCount();
         consecutiveTimeouts = 0; // Reset timeout counter on successful ranging
         rangingOk = true;
+
+        // Count successful ranging for rate debug
+        noteSuccessfulRange();
 #if (MAX_SWARM_SIZE > 2)
       // Instead of fixed ring protocol, use random peer selection
       // This makes the protocol more robust to individual crazyflie failures
@@ -584,10 +608,31 @@ static uint32_t twrTagOnEvent(dwDevice_t *dev, uwbEvent_t event)
     case eventPacketSent:
       txcallback(dev);
       break;
+    case eventReceiveFailed:
+    // Likely collision/CRC/SFD error. Don’t spend seconds retrying on same peer.
+      if (current_mode_trans) {
+        current_receiveID = selectNextPeer();
+        consecutiveTimeouts = 0;
+
+        txPacket.payload[LPS_TWR_TYPE] = LPS_TWR_POLL;
+        txPacket.payload[LPS_TWR_SEQ] = 0;
+        txPacket.sourceAddress = selfAddress;
+        txPacket.destAddress = basicAddr + current_receiveID;
+
+        dwNewTransmit(dev);
+        dwSetDefaults(dev);
+        dwSetData(dev, (uint8_t *)&txPacket, MAC802154_HEADER_LENGTH + 2);
+        dwWaitForResponse(dev, true);
+        dwStartTransmit(dev);
+      } else {
+        dwNewReceive(dev);
+        dwSetDefaults(dev);
+        dwStartReceive(dev);
+      }
+      break;
     case eventTimeout:  // Comes back to timeout after each ranging attempt
     case eventReceiveTimeout:
-    case eventReceiveFailed:
-      if (current_mode_trans == true)
+      if (current_mode_trans)
       {
         consecutiveTimeouts++;
 
@@ -669,6 +714,10 @@ static void twrTagInit(dwDevice_t *dev)
     lastSuccessfulRanging[i] = currentTick;
   }
   consecutiveTimeouts = 0;
+
+  // Init ranging rate tracking
+  lastRateTick = xTaskGetTickCount();
+  successfulRangeCount = 0;
 
 
   // Communication logic between each UWB
