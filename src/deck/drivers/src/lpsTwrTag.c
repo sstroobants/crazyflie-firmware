@@ -39,6 +39,13 @@
 #include "debug.h"
 
 
+// TODO: ADD A TIMER THAT WHEN DRONE DOESN'T SEE ANY MESSAGE IN selfID*TIMEOUTPERIOD SECONDS, IT INITIATES A NEW RANGING
+// TODO: MOVE lastSuccessfulRanging TO ANY OVERHEARD MESSAGE INSTEAD OF ONLY WHEN IT RESPONDS TO US
+// TODO: RIGHT NOW ALL OTHER BEACONS INITIALIZE WITH MESSAGE AT START, BUT IF THEY ARE TURNED ON LATER, THEY WILL BE SEEN AS "INACTIVE" AND NEVER BECOME PART OF THE RING
+
+
+// TODO: CLEAN UP THIS MESS
+
 // #define ANTENNA_OFFSET 154.6 // In meter
 #define basicAddr 0xbccf851300000000
 // Define: id = last_number_of_address - 5
@@ -122,6 +129,12 @@ static bool checkTurn;
 static uint32_t checkTurnTick = 0;
 #endif
 
+// Timeout and peer tracking for robust communication
+static uint32_t lastSuccessfulRanging[MAX_SWARM_SIZE];
+static uint32_t consecutiveTimeouts = 0;
+#define MAX_CONSECUTIVE_TIMEOUTS 3
+#define PEER_TIMEOUT_MS 5000  // Consider peer inactive after 5 seconds
+
 // Median filter for distance ranging (size=3)
 typedef struct
 {
@@ -149,6 +162,67 @@ static uint16_t median_filter_3(uint16_t *data)
 }
 #define ABS(a) ((a) > 0 ? (a) : -(a))
 
+// Helper function to select a random peer from the swarm (excluding self)
+static uint8_t selectRandomPeer(void)
+{
+  // Use xTaskGetTickCount as a simple random seed
+  uint32_t tick = xTaskGetTickCount();
+  // DEBUG THIS LINE ABOVE TO CHECK IF THIS IS REALLY RANDOM, OR HAPPENS TO TRIGGER AT REGULAR INTERVALS
+
+  uint8_t numPeers = swarmSize - 1; // Exclude self
+
+  if (numPeers == 0) {
+    return selfID; // No peers available
+  }
+
+  // Simple random selection based on tick count
+  uint8_t peerIndex = tick % numPeers;
+  uint8_t selectedPeer = peerIndex;
+
+  // Skip self ID
+  if (selectedPeer >= selfID) {
+    selectedPeer++;
+  }
+
+  return selectedPeer;
+}
+
+// Helper function to check if a peer is active (has responded recently)
+// static bool isPeerActive(uint8_t peerID)
+// {
+//   uint32_t currentTick = xTaskGetTickCount();
+//   uint32_t timeSinceLastRanging = currentTick - lastSuccessfulRanging[peerID];
+
+//   // Convert ticks to ms (assuming 1 tick = 1 ms, which is typical for FreeRTOS)
+//   return timeSinceLastRanging < PEER_TIMEOUT_MS;
+// }
+
+// Helper function to select next peer to communicate with
+// Prefers random active peers, falls back to any peer if none are active
+// FOR NOW JUST ALWAYS SELECT A RANDOM PEER
+static uint8_t selectNextPeer(void)
+{
+  // uint8_t activePeers[MAX_SWARM_SIZE]; // TODO: COULDN'T THIS JUST BE swarmSize?
+  // uint8_t activeCount = 0;
+
+  // // Collect active peers
+  // for (uint8_t i = 0; i < swarmSize; i++) {
+  //   if (i != selfID && isPeerActive(i)) {
+  //     activePeers[activeCount++] = i;
+  //   }
+  // }
+
+  // // If we have active peers, select randomly from them
+  // if (activeCount > 0) {
+  //   uint32_t tick = xTaskGetTickCount();
+  //   uint8_t index = tick % activeCount; // AGAIN: CHECK HOW RANDOM THIS REALLY IS
+  //   return activePeers[index];
+  // }
+
+  // No active peers, select any random peer (excluding self)
+  return selectRandomPeer();
+}
+
 static void txcallback(dwDevice_t *dev)
 {
   dwTime_t departure;
@@ -165,8 +239,9 @@ static void txcallback(dwDevice_t *dev)
       final_tx = departure;
       break;
     case LPS_TWR_REPORT + 1:
-#if (MAX_SWARM_SIZE > 2)
-      if ((current_receiveID == 0) || (current_receiveID - 1 == selfID))
+// #if (MAX_SWARM_SIZE > 2)
+// TODO: WHAT IS HAPPENING HERE?
+      if (current_receiveID == (txPacket.destAddress & 0xFF))
       {
         // current_receiveID = current_receiveID;
         current_mode_trans = false;
@@ -182,7 +257,7 @@ static void txcallback(dwDevice_t *dev)
       {
         current_receiveID = current_receiveID - 1;
       }
-#endif
+// #endif
       break;
     }
   }
@@ -219,6 +294,10 @@ static void rxcallback(dwDevice_t *dev) {
       // pktType,
       // dataLength);
 
+  // WE COULD IMPLEMENT SOMETHING HERE THAT LISTENS TO THE DESTINATION AND USES THAT TO DETERMINE FAILED CFS?
+
+  uint8_t sourceId = (uint8_t)(rxPacket.sourceAddress & 0xFF);
+  lastSuccessfulRanging[sourceId] = xTaskGetTickCount();
   if (rxPacket.destAddress != selfAddress) {
     if (current_mode_trans)
     {
@@ -289,6 +368,11 @@ static void rxcallback(dwDevice_t *dev) {
           median_data[current_receiveID].index_inserting = 0;
         median_data[current_receiveID].distance_history[median_data[current_receiveID].index_inserting] = calcDist;
         rangingOk = true;
+
+        // Update last successful ranging timestamp
+        lastSuccessfulRanging[current_receiveID] = xTaskGetTickCount();
+        consecutiveTimeouts = 0; // Reset timeout counter on successful ranging
+
         state.x[current_receiveID] = report->selfX;
         state.y[current_receiveID] = report->selfY;
         state.gz[current_receiveID] = report->selfGz;
@@ -343,107 +427,122 @@ static void rxcallback(dwDevice_t *dev) {
   {
     switch (rxPacket.payload[LPS_TWR_TYPE])
     {
-    case LPS_TWR_POLL:
-    {
-      txPacket.payload[LPS_TWR_TYPE] = LPS_TWR_ANSWER;
-      txPacket.payload[LPS_TWR_SEQ] = rxPacket.payload[LPS_TWR_SEQ];
-      dwGetReceiveTimestamp(dev, &arival);
-      arival.full -= (options->antennaDelay / 2);
-      poll_rx = arival;
-      dwNewTransmit(dev);
-      dwSetData(dev, (uint8_t *)&txPacket, MAC802154_HEADER_LENGTH + 2);
-      dwWaitForResponse(dev, true);
-      dwStartTransmit(dev);
-      break;
-    }
-    case LPS_TWR_FINAL:
-    {
-      lpsTwrTagReportPayload_t *report = (lpsTwrTagReportPayload_t *)(txPacket.payload + 2);
-      dwGetReceiveTimestamp(dev, &arival);
-      arival.full -= (options->antennaDelay / 2);
-      final_rx = arival;
-      txPacket.payload[LPS_TWR_TYPE] = LPS_TWR_REPORT;
-      txPacket.payload[LPS_TWR_SEQ] = rxPacket.payload[LPS_TWR_SEQ];
-      memcpy(&report->pollRx, &poll_rx, 5);
-      memcpy(&report->answerTx, &answer_tx, 5);
-      memcpy(&report->finalRx, &final_rx, 5);
-      
-      // first load data into local variable to prevent memory misalignment warning
-      float selfX= report->selfX;
-      float selfY = report->selfY;
-      float selfGz = report->selfGz;
-      float selfh = report->selfh;
-
-      // Fetch latest self state to include in the report
-      swarmInfoGet(&selfX, &selfY, &selfGz, &selfh);
-      report->selfX = selfX;
-      report->selfY = selfY;
-      report->selfGz = selfGz;
-      report->selfh = selfh;
-
-      report->keep_flying = state.keep_flying;
-      dwNewTransmit(dev);
-      dwSetData(dev, (uint8_t *)&txPacket, MAC802154_HEADER_LENGTH + 2 + sizeof(lpsTwrTagReportPayload_t));
-      dwWaitForResponse(dev, true);
-      dwStartTransmit(dev);
-      break;
-    }
-    case (LPS_TWR_REPORT + 1):
-    {
-      lpsTwrTagReportPayload_t *report2 = (lpsTwrTagReportPayload_t *)(rxPacket.payload + 2);
-  uint8_t rangingID = (uint8_t)(rxPacket.sourceAddress & 0xFF);
-  uint8_t n = effectiveSwarmSize();
-  if ((report2->reciprocalDistance) != 0 && rangingID < n)
+      case LPS_TWR_POLL:
       {
-        // received distance has large noise
-        uint16_t calcDist = report2->reciprocalDistance;
-        uint16_t medianDist = median_filter_3(median_data[rangingID].distance_history);
-        if (ABS(medianDist - calcDist) > 500)
-          state.distance[rangingID] = medianDist;
-        else
-          state.distance[rangingID] = calcDist;
-        median_data[rangingID].index_inserting++;
-        if (median_data[rangingID].index_inserting == 3)
-          median_data[rangingID].index_inserting = 0;
-        median_data[rangingID].distance_history[median_data[rangingID].index_inserting] = calcDist;
-        state.x[rangingID] = report2->selfX;
-        state.y[rangingID] = report2->selfY;
-        state.gz[rangingID] = report2->selfGz;
-        state.h[rangingID] = report2->selfh;
-        if (rangingID == 0)
-          state.keep_flying = report2->keep_flying;
-        state.refresh[rangingID] = true;
-
-        // DEBUG_PRINT("Received reciprocal distance measurement from ID %d: %u mm from pos (%.2f, %.2f, %.2f)\n", rangingID, report2->reciprocalDistance, (double)state.x[rangingID], (double)state.y[rangingID], (double)state.h[rangingID]);
-        // Push distance measurement to estimator if the drone is not an anchor
-        if (isAnchor == 0)
-        {
-          distanceMeasurement_t dist;
-          dist.distance = (float)state.distance[rangingID] / 1000.0f;
-          dist.x = state.x[rangingID];
-          dist.y = state.y[rangingID];
-          dist.z = state.h[rangingID];
-          dist.anchorId = rangingID;
-          dist.stdDev = 0.25; // Make this depend on type of other crazyflie
-          // DEBUG_PRINT("Tag got distance to Anchor %u: %.2f m\n", rangingID, (double)dist.distance);
-          estimatorEnqueueDistance(&dist);
-        }
+        txPacket.payload[LPS_TWR_TYPE] = LPS_TWR_ANSWER;
+        txPacket.payload[LPS_TWR_SEQ] = rxPacket.payload[LPS_TWR_SEQ];
+        dwGetReceiveTimestamp(dev, &arival);
+        arival.full -= (options->antennaDelay / 2);
+        poll_rx = arival;
+        dwNewTransmit(dev);
+        dwSetData(dev, (uint8_t *)&txPacket, MAC802154_HEADER_LENGTH + 2);
+        dwWaitForResponse(dev, true);
+        dwStartTransmit(dev);
+        break;
       }
-      rangingOk = true;
-#if (MAX_SWARM_SIZE > 2)
-      uint8_t fromID = (uint8_t)(rxPacket.sourceAddress & 0xFF);
-      if (selfID == fromID + 1 || selfID == 0)
+      case LPS_TWR_FINAL:
       {
+        lpsTwrTagReportPayload_t *report = (lpsTwrTagReportPayload_t *)(txPacket.payload + 2);
+        dwGetReceiveTimestamp(dev, &arival);
+        arival.full -= (options->antennaDelay / 2);
+        final_rx = arival;
+        txPacket.payload[LPS_TWR_TYPE] = LPS_TWR_REPORT;
+        txPacket.payload[LPS_TWR_SEQ] = rxPacket.payload[LPS_TWR_SEQ];
+        memcpy(&report->pollRx, &poll_rx, 5);
+        memcpy(&report->answerTx, &answer_tx, 5);
+        memcpy(&report->finalRx, &final_rx, 5);
+        
+        // first load data into local variable to prevent memory misalignment warning
+        float selfX= report->selfX;
+        float selfY = report->selfY;
+        float selfGz = report->selfGz;
+        float selfh = report->selfh;
+
+        // Fetch latest self state to include in the report
+        swarmInfoGet(&selfX, &selfY, &selfGz, &selfh);
+        report->selfX = selfX;
+        report->selfY = selfY;
+        report->selfGz = selfGz;
+        report->selfh = selfh;
+
+        report->keep_flying = state.keep_flying;
+        dwNewTransmit(dev);
+        dwSetData(dev, (uint8_t *)&txPacket, MAC802154_HEADER_LENGTH + 2 + sizeof(lpsTwrTagReportPayload_t));
+        dwWaitForResponse(dev, true);
+        dwStartTransmit(dev);
+        break;
+      }
+      case (LPS_TWR_REPORT + 1):
+      {
+        lpsTwrTagReportPayload_t *report2 = (lpsTwrTagReportPayload_t *)(rxPacket.payload + 2);
+        uint8_t rangingID = (uint8_t)(rxPacket.sourceAddress & 0xFF);
+        uint8_t n = effectiveSwarmSize();
+        if ((report2->reciprocalDistance) != 0 && rangingID < n) // IS THE SECOND IF STATEMENT REALLY NECESSARY?
+        {
+          // received distance has large noise
+          uint16_t calcDist = report2->reciprocalDistance;
+          uint16_t medianDist = median_filter_3(median_data[rangingID].distance_history);
+          if (ABS(medianDist - calcDist) > 500)
+            state.distance[rangingID] = medianDist;
+          else
+            state.distance[rangingID] = calcDist;
+          median_data[rangingID].index_inserting++;
+          if (median_data[rangingID].index_inserting == 3)
+            median_data[rangingID].index_inserting = 0;
+          median_data[rangingID].distance_history[median_data[rangingID].index_inserting] = calcDist;
+          state.x[rangingID] = report2->selfX;
+          state.y[rangingID] = report2->selfY;
+          state.gz[rangingID] = report2->selfGz;
+          state.h[rangingID] = report2->selfh;
+          if (rangingID == 0)
+            state.keep_flying = report2->keep_flying;
+          state.refresh[rangingID] = true;
+
+          // DEBUG_PRINT("Received reciprocal distance measurement from ID %d: %u mm from pos (%.2f, %.2f, %.2f)\n", rangingID, report2->reciprocalDistance, (double)state.x[rangingID], (double)state.y[rangingID], (double)state.h[rangingID]);
+          // Push distance measurement to estimator if the drone is not an anchor
+          if (isAnchor == 0)
+          {
+            distanceMeasurement_t dist;
+            dist.distance = (float)state.distance[rangingID] / 1000.0f;
+            dist.x = state.x[rangingID];
+            dist.y = state.y[rangingID];
+            dist.z = state.h[rangingID];
+            dist.anchorId = rangingID;
+            dist.stdDev = 0.25; // Make this depend on type of other crazyflie
+            // DEBUG_PRINT("Tag got distance to Anchor %u: %.2f m\n", rangingID, (double)dist.distance);
+            estimatorEnqueueDistance(&dist);
+          }
+        }
+        // Update last successful ranging timestamp
+        lastSuccessfulRanging[rangingID] = xTaskGetTickCount();
+        consecutiveTimeouts = 0; // Reset timeout counter on successful ranging
+        rangingOk = true;
+#if (MAX_SWARM_SIZE > 2)
+      // Instead of fixed ring protocol, use random peer selection
+      // This makes the protocol more robust to individual crazyflie failures
+
+
+      //  REMOVED THESE LINES, I THINK THEY ONLY COMPLICATE MATTERS:
+
+
+      // Randomly decide whether to initiate next ranging (distributed approach)
+      // Use a probability-based approach: each crazyflie has roughly 2/swarmSize chance
+      // This ensures enough communication activity while avoiding excessive collisions
+      // THIS ONLY HAPPENS AFTER RECEIVING LPS_TWR_REPORT+1 RIGHT? SO ONLY THE CRAZYFLIE RECEIVING WILL CHECK THIS?
+      // uint32_t tick = xTaskGetTickCount();
+      // bool shouldInitiate = ((tick + selfID) % swarmSize) < 2; // AGAIN, CHECK THE RANDOMNESS HERE
+      // ALSO, THE ADDITION OF selfID DOESNT DO ANYTHING SINCE THE CLOCKS OF THE CFs ARE NOT SYNCED?
+
+      // if (shouldInitiate)
+      // {
+      
         current_mode_trans = true;
         dwIdle(dev);
         dwSetReceiveWaitTimeout(dev, 1000);
-        uint8_t lastId = (effectiveSwarmSize() > 0) ? (uint8_t)(effectiveSwarmSize() - 1) : 0;
-        if (selfID == lastId)
-          current_receiveID = 0;
-        else
-          current_receiveID = lastId;
-        if (selfID == 0)
-          current_receiveID = (lastId > 0) ? (uint8_t)(lastId - 1) : 0; // previous in ring
+
+        // Select a random peer to communicate with
+        current_receiveID = selectNextPeer();
+
         txPacket.payload[LPS_TWR_TYPE] = LPS_TWR_POLL;
         txPacket.payload[LPS_TWR_SEQ] = 0;
         txPacket.sourceAddress = selfAddress;
@@ -453,16 +552,16 @@ static void rxcallback(dwDevice_t *dev) {
         dwSetData(dev, (uint8_t *)&txPacket, MAC802154_HEADER_LENGTH + 2);
         dwWaitForResponse(dev, true);
         dwStartTransmit(dev);
-      }
-      else
-      {
+      // }
+      // else
+      // {
 #endif
-        dwNewReceive(dev);
-        dwSetDefaults(dev);
-        dwStartReceive(dev);
-#if (MAX_SWARM_SIZE > 2)
-      }
-#endif
+        // dwNewReceive(dev);
+        // dwSetDefaults(dev);
+        // dwStartReceive(dev);
+// #if (MAX_SWARM_SIZE > 2)
+      // }
+// #endif
       break;
     }
     }
@@ -490,6 +589,16 @@ static uint32_t twrTagOnEvent(dwDevice_t *dev, uwbEvent_t event)
     case eventReceiveFailed:
       if (current_mode_trans == true)
       {
+        consecutiveTimeouts++;
+
+        // If we've had too many timeouts with current peer, try a different one
+        if (consecutiveTimeouts >= MAX_CONSECUTIVE_TIMEOUTS) {
+          DEBUG_PRINT("TWR Tag ID %d: switching peer due to timeouts when sending to %d\n", selfID, current_receiveID);
+          current_receiveID = selectNextPeer();
+          consecutiveTimeouts = 0;
+        }
+
+
         txPacket.payload[LPS_TWR_TYPE] = LPS_TWR_POLL;
         txPacket.payload[LPS_TWR_SEQ] = 0;
         txPacket.sourceAddress = selfAddress;
@@ -553,16 +662,27 @@ static void twrTagInit(dwDevice_t *dev)
   selfID = (uint8_t)(configblockGetRadioAddress() & 0xF);
   selfAddress = basicAddr + selfID;
 
+  // Initialize peer activity tracking
+  uint32_t currentTick = xTaskGetTickCount();
+  for (int i = 0; i < (LOCODECK_NR_OF_TWR_ANCHORS + 1); i++)
+  {
+    lastSuccessfulRanging[i] = currentTick;
+  }
+  consecutiveTimeouts = 0;
+
+
   // Communication logic between each UWB
+  // Use random initial peer selection for more robust startup
+  // WHAT HAPPENS NOW IF ID 00 IS NOT AROUND?
   if (selfID == 0)
   {
-  current_receiveID = (uint8_t)(effectiveSwarmSize() - 1);
+    current_receiveID = selectRandomPeer();
     current_mode_trans = true;
     dwSetReceiveWaitTimeout(dev, 1000);
   }
   else
   {
-    // current_receiveID = 0;
+    current_receiveID = selectRandomPeer(); // WHY IS THIS NECESSARY?
     current_mode_trans = false;
     dwSetReceiveWaitTimeout(dev, TWR_RECEIVE_TIMEOUT);
   }
