@@ -259,22 +259,26 @@ static void txcallback(dwDevice_t *dev)
     case LPS_TWR_REPORT + 1:
 // #if (MAX_SWARM_SIZE > 2)
 // TODO: WHAT IS HAPPENING HERE?
-      if (current_receiveID == (txPacket.destAddress & 0xFF))
-      {
+      // if (current_receiveID == (txPacket.destAddress & 0xFF))
+      // {
         // current_receiveID = current_receiveID;
-        current_mode_trans = false;
-        dwIdle(dev);
-        dwSetReceiveWaitTimeout(dev, 10000);
-        dwNewReceive(dev);
-        dwSetDefaults(dev);
-        dwStartReceive(dev);
-        checkTurn = true;
-        checkTurnTick = xTaskGetTickCount();
-      }
-      else
-      {
-        current_receiveID = current_receiveID - 1;
-      }
+      current_mode_trans = false;
+      dwIdle(dev);
+      dwSetReceiveWaitTimeout(dev, 10000);
+      dwNewReceive(dev);
+      dwSetDefaults(dev);
+      dwStartReceive(dev);
+
+      // Plan next peer randomly (robust vs. failures)
+      current_receiveID = selectNextPeer();
+
+      checkTurn = true;
+      checkTurnTick = xTaskGetTickCount();
+      // }
+      // else
+      // {
+      //   current_receiveID = current_receiveID - 1;
+      // }
 // #endif
       break;
     }
