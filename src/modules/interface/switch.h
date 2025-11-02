@@ -6,6 +6,7 @@
 
 void switchInit(void);
 void auxSwitchTask(void *arg);
+bool auxConnected(void);
 bool auxState(uint8_t auxNumber);
 void armWithAux(void);
 

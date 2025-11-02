@@ -51,22 +51,30 @@ void auxSwitchTask(void *arg)
       aux_2 = logGetUint(idAux2);
       aux_3 = logGetUint(idAux3);
 
-    //   check if we need to arm/disarm
-      if (auxState(3))
+      if (auxConnected())
       {
-        if (!supervisorIsArmed())
+      //   check if we need to arm/disarm
+        if (auxState(3))
         {
-          supervisorRequestArming(true);
-          DEBUG_PRINT("Arming with AUX3\n");
+          if (!supervisorIsArmed())
+          {
+            supervisorRequestArming(true);
+            DEBUG_PRINT("Arming with AUX3\n");
+          }
         }
-    }
-      else if (supervisorIsArmed())
-      {
+        else if (supervisorIsArmed())
+        {
           supervisorRequestArming(false);
           DEBUG_PRINT("Disarming with AUX3\n");
+        }
       }
     }
   }
+}
+
+bool auxConnected(void)
+{
+  return aux_0 > 0 || aux_1 > 0 ||  aux_2 > 0 || aux_3 > 0;
 }
 
 bool auxState(uint8_t auxNumber)
