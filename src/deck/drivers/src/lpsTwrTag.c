@@ -135,6 +135,14 @@ static uint32_t consecutiveTimeouts = 0;
 #define MAX_CONSECUTIVE_TIMEOUTS 3
 #define PEER_TIMEOUT_MS 5000  // Consider peer inactive after 5 seconds
 
+// ID-dependent timeout for starting communication when no messages are overheard
+static uint32_t lastOverheardMessage = 0;  // Track when we last heard ANY message
+static bool hasOverheardAnyMessage = false;  // Track if we've ever heard a message
+static uint32_t lastTimeoutStart = 0;  // Track when we last started due to timeout
+#define TIMEOUT_BASE_MS 1000  // Base timeout period 
+#define MAX_STARTUP_TIMEOUT_MS 10000  // Maximum time to wait before forcing startup
+#define MIN_TIMEOUT_START_INTERVAL_MS 500  // Minimum interval between timeout-based starts
+
 // Median filter for distance ranging (size=3)
 typedef struct
 {
@@ -203,6 +211,39 @@ static uint8_t selectRandomPeer(void)
   }
 
   return selectedPeer;
+}
+
+// Check if this node should start communication due to timeout
+static bool shouldStartDueToTimeout(void)
+{
+  uint32_t currentTick = xTaskGetTickCount();
+  
+  // Prevent too frequent timeout-based starts
+  if (currentTick < lastTimeoutStart + MIN_TIMEOUT_START_INTERVAL_MS) {
+    return false;
+  }
+  
+  // If we've never heard any message, use ID-dependent timeout
+  // if (!hasOverheardAnyMessage) {
+  //   // Calculate ID-dependent timeout: selfID * TIMEOUT_BASE_MS
+  //   // Add a small random component to prevent exact synchronization
+  //   uint32_t idTimeout = (selfID + 1) * TIMEOUT_BASE_MS; // +1 so ID 0 doesn't have 0 timeout
+  //   uint32_t randomOffset = (selfID * 137) % 200; // Pseudo-random 0-199ms offset
+  //   uint32_t totalTimeout = idTimeout + randomOffset;
+    
+  //   // Limit maximum startup timeout
+  //   if (totalTimeout > MAX_STARTUP_TIMEOUT_MS) {
+  //     totalTimeout = MAX_STARTUP_TIMEOUT_MS;
+  //   }
+    
+  //   return (currentTick > totalTimeout);
+  // }
+  
+  // If we have heard messages before, check if it's been too long since the last one
+  uint32_t timeSinceLastMessage = currentTick - lastOverheardMessage;
+  uint32_t idBasedTimeout = (selfID + 1) * TIMEOUT_BASE_MS;
+  
+  return (timeSinceLastMessage > idBasedTimeout);
 }
 
 // Helper function to check if a peer is active (has responded recently)
@@ -307,6 +348,11 @@ static void rxcallback(dwDevice_t *dev) {
 
   dwGetData(dev, (uint8_t*)&rxPacket, dataLength);
 
+  // Track that we've overheard a message (any message, not just for us)
+  uint32_t currentTick = xTaskGetTickCount();
+  lastOverheardMessage = currentTick;
+  hasOverheardAnyMessage = true;
+
   // Debug: log what IDs 1 and 2 are receiving
   // uint8_t pktType = rxPacket.payload[LPS_TWR_TYPE];
   // DEBUG_PRINT("RX(self=%u): src=%02x dst=%02x type=%u len=%d\n",
@@ -321,17 +367,20 @@ static void rxcallback(dwDevice_t *dev) {
   uint8_t sourceId = (uint8_t)(rxPacket.sourceAddress & 0xFF);
   lastSuccessfulRanging[sourceId] = xTaskGetTickCount();
   if (rxPacket.destAddress != selfAddress) {
-    if (current_mode_trans)
+//     if (current_mode_trans)
+//     {
+// // #if (MAX_SWARM_SIZE > 2)
+//       current_mode_trans = false;
+// // #endif
+//       dwIdle(dev);
+//       dwSetReceiveWaitTimeout(dev, 10000);
+//     }
+    if (!current_mode_trans)
     {
-// #if (MAX_SWARM_SIZE > 2)
-      current_mode_trans = false;
-// #endif
-      dwIdle(dev);
-      dwSetReceiveWaitTimeout(dev, 10000);
-    }
     dwNewReceive(dev);
     dwSetDefaults(dev);
     dwStartReceive(dev);
+    }
     return;
   }
 
@@ -614,9 +663,11 @@ static uint32_t twrTagOnEvent(dwDevice_t *dev, uwbEvent_t event)
       break;
     case eventReceiveFailed:
     // Likely collision/CRC/SFD error. Don’t spend seconds retrying on same peer.
+      dwIdle(dev);
       if (current_mode_trans) {
         current_receiveID = selectNextPeer();
         consecutiveTimeouts = 0;
+
 
         txPacket.payload[LPS_TWR_TYPE] = LPS_TWR_POLL;
         txPacket.payload[LPS_TWR_SEQ] = 0;
@@ -630,7 +681,7 @@ static uint32_t twrTagOnEvent(dwDevice_t *dev, uwbEvent_t event)
         dwStartTransmit(dev);
       } else {
         dwNewReceive(dev);
-        dwSetDefaults(dev);
+        dwSetDefaults(dev); 
         dwStartReceive(dev);
       }
       break;
@@ -647,7 +698,7 @@ static uint32_t twrTagOnEvent(dwDevice_t *dev, uwbEvent_t event)
           consecutiveTimeouts = 0;
         }
 
-
+        dwIdle(dev);
         txPacket.payload[LPS_TWR_TYPE] = LPS_TWR_POLL;
         txPacket.payload[LPS_TWR_SEQ] = 0;
         txPacket.sourceAddress = selfAddress;
@@ -661,10 +712,19 @@ static uint32_t twrTagOnEvent(dwDevice_t *dev, uwbEvent_t event)
       else
       {
 #if (MAX_SWARM_SIZE > 2)
+        // Check if we should start communication due to ID-dependent timeout
+        bool shouldStartTimeout = shouldStartDueToTimeout();
+        
         if (xTaskGetTickCount() > checkTurnTick + 20) // > 20ms
         {
-          if (checkTurn == true)
+          if (checkTurn == true || shouldStartTimeout)
           {
+            // If starting due to timeout, log it for debugging and record the time
+            if (shouldStartTimeout && !checkTurn) {
+              DEBUG_PRINT("TWR Tag ID %d: starting communication due to timeout\n", selfID);
+              lastTimeoutStart = xTaskGetTickCount();
+            }
+            
             current_mode_trans = true;
             dwIdle(dev);
             dwSetReceiveWaitTimeout(dev, 1000);
@@ -719,26 +779,22 @@ static void twrTagInit(dwDevice_t *dev)
   }
   consecutiveTimeouts = 0;
 
+  // Initialize timeout-based startup mechanism
+  lastOverheardMessage = currentTick;
+  hasOverheardAnyMessage = false;
+  lastTimeoutStart = 0;
+
   // Init ranging rate tracking
   lastRateTick = xTaskGetTickCount();
   successfulRangeCount = 0;
 
 
   // Communication logic between each UWB
-  // Use random initial peer selection for more robust startup
-  // WHAT HAPPENS NOW IF ID 00 IS NOT AROUND?
-  if (selfID == 0)
-  {
-    current_receiveID = selectRandomPeer();
-    current_mode_trans = true;
-    dwSetReceiveWaitTimeout(dev, 1000);
-  }
-  else
-  {
-    current_receiveID = selectRandomPeer(); // WHY IS THIS NECESSARY?
-    current_mode_trans = false;
-    dwSetReceiveWaitTimeout(dev, TWR_RECEIVE_TIMEOUT);
-  }
+  // All nodes start in receive mode and use timeout-based startup
+  // This prevents immediate collisions and allows for distributed startup
+  current_receiveID = selectRandomPeer();
+  current_mode_trans = false;
+  dwSetReceiveWaitTimeout(dev, TWR_RECEIVE_TIMEOUT);
 
   for (int i = 0; i < MAX_SWARM_SIZE; i++)
   {
