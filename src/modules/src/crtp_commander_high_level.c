@@ -154,11 +154,24 @@ static void oaInitSensors()
   oaIdRight = logGetVarId("range", "right");
 }
 
-// Decide if we are mainly moving along X (forward/back) or Y (left/right)
-static inline bool oaIsMainlyX(const struct vec from, const struct vec to) {
-  const float dx = to.x - from.x;
-  const float dy = to.y - from.y;
-  return fabsf(dx) >= fabsf(dy);
+// Transform global direction vector to body frame considering current yaw
+static struct vec globalToBody(const struct vec globalDir, float yawRad) {
+  const float cosYaw = cosf(yawRad);
+  const float sinYaw = sinf(yawRad);
+  
+  struct vec bodyDir;
+  bodyDir.x = cosYaw * globalDir.x + sinYaw * globalDir.y;   // forward/back in body frame
+  bodyDir.y = -sinYaw * globalDir.x + cosYaw * globalDir.y;  // left/right in body frame
+  bodyDir.z = globalDir.z;
+  
+  return bodyDir;
+}
+
+// Decide if we are mainly moving along body X (forward/back) or body Y (left/right)
+static inline bool oaIsMainlyBodyX(const struct vec from, const struct vec to, float yawRad) {
+  const struct vec globalDir = mkvec(to.x - from.x, to.y - from.y, to.z - from.z);
+  const struct vec bodyDir = globalToBody(globalDir, yawRad);
+  return fabsf(bodyDir.x) >= fabsf(bodyDir.y);
 }
 
 static void oaRecordGoal(const struct vec absGoalPos, const float goalYawRad)
@@ -168,6 +181,8 @@ static void oaRecordGoal(const struct vec absGoalPos, const float goalYawRad)
   oaCtx.goalYaw = goalYawRad;
   oaCtx.mode = OA_IDLE;
 }
+
+
 
 // Try to replan a sidestep if obstacle is too close in the motion direction
 static void oaMaybeReplanSidestep()
@@ -187,7 +202,7 @@ static void oaMaybeReplanSidestep()
     const float dy = oaCtx.sidestepTarget.y - pos.y;
     const float dist = sqrtf(dx*dx + dy*dy);
 
-    // Update direction logs for sidestep
+    // Update direction logs for sidestep (keep in global frame for logging)
     const float n = fmaxf(sqrtf(dx*dx + dy*dy), 1e-6f);
     oaLogDirDX = dx / n;
     oaLogDirDY = dy / n;
@@ -214,65 +229,100 @@ static void oaMaybeReplanSidestep()
     return;
   }
 
-  // If not sidestepping, compute goal direction and log it
+  // If not sidestepping, compute goal direction and transform to body frame
   const float gdx = oaCtx.goalPos.x - pos.x;
   const float gdy = oaCtx.goalPos.y - pos.y;
   const float gn = fmaxf(sqrtf(gdx*gdx + gdy*gdy), 1e-6f);
+  
+  // Log global direction for debugging
   oaLogDirDX = gdx / gn;
   oaLogDirDY = gdy / gn;
-  const bool alongX = oaIsMainlyX(pos, oaCtx.goalPos);
-  oaLogDirAxis = alongX ? 1 : 2;
-  oaLogDirSign = alongX ? (gdx >= 0.0f ? 1 : -1) : (gdy >= 0.0f ? 1 : -1);
+  
+  // Transform to body frame for sensor selection
+  const struct vec globalDir = mkvec(gdx / gn, gdy / gn, 0.0f);
+  const struct vec bodyDir = globalToBody(globalDir, yaw);
+  
+  const bool alongBodyX = fabsf(bodyDir.x) >= fabsf(bodyDir.y);
+  
+  // Update logging to reflect body frame analysis
+  oaLogDirAxis = alongBodyX ? 1 : 2;
+  oaLogDirSign = alongBodyX ? (bodyDir.x >= 0.0f ? 1 : -1) : (bodyDir.y >= 0.0f ? 1 : -1);
 
-  // If not sidestepping, check for obstacle along motion direction
-  if (alongX) {
-    const float dir = (oaCtx.goalPos.x - pos.x) >= 0.0f ? 1.0f : -1.0f;
-    const uint16_t dForward = dir > 0 ? oaReadRange(oaIdFront) : oaReadRange(oaIdBack);
-    // DEBUG_PRINT("OA: dForward=%u mm\n", dForward);
+  // Check obstacles based on body frame motion direction
+  if (alongBodyX) {
+    // Moving primarily forward/backward in body frame
+    const float bodyDirSign = bodyDir.x >= 0.0f ? 1.0f : -1.0f;
+    const uint16_t dForward = bodyDirSign > 0 ? oaReadRange(oaIdFront) : oaReadRange(oaIdBack);
+    
     if (dForward != UINT16_MAX && dForward > 0 && dForward < oaStop_mm) {
       // Choose lateral sidestep toward side with more clearance
       const uint16_t dLeft = oaReadRange(oaIdLeft);
       const uint16_t dRight = oaReadRange(oaIdRight);
-      const float sideSign = (dLeft >= dRight) ? 1.0f : -1.0f; // +Y is left, -Y is right
-
-      const float dy = sideSign * oaSidestep_m;
-      const struct vec relStep = mkvec(0.0f, dy, 0.0f);
+      const float bodySideSign = (dLeft >= dRight) ? 1.0f : -1.0f; // +Y is left, -Y is right in body frame
+      
+      // Transform body frame sidestep back to global frame
+      const float bodySidestepY = bodySideSign * oaSidestep_m;
+      const struct vec bodySidestep = mkvec(0.0f, bodySidestepY, 0.0f);
+      
+      // Transform back to global frame
+      const float cosYaw = cosf(yaw);
+      const float sinYaw = sinf(yaw);
+      const float globalDx = -sinYaw * bodySidestep.y;  // body Y becomes global X component
+      const float globalDy = cosYaw * bodySidestep.y;   // body Y becomes global Y component
+      
+      const struct vec relStep = mkvec(globalDx, globalDy, 0.0f);
 
       xSemaphoreTake(lockTraj, portMAX_DELAY);
       float t = usecTimestamp() / 1e6f;
       const float speed = 0.4f; // m/s sideways
-      const float duration = fmaxf(fabsf(dy) / speed, 0.6f);
+      const float stepDist = sqrtf(globalDx*globalDx + globalDy*globalDy);
+      const float duration = fmaxf(stepDist / speed, 0.6f);
+      
       // Plan a short, linear, relative sidestep at constant Z and current yaw
-      (void)plan_go_to(&planner, /*relative*/true, /*linear*/true, relStep, yaw, duration, t);
+      (void)plan_go_to(&planner, /*relative*/true, /*linear*/true, relStep, 0.0f, duration, t);
       xSemaphoreGive(lockTraj);
 
       oaCtx.mode = OA_SIDESTEP;
-      oaCtx.sidestepTarget = mkvec(pos.x, pos.y + dy, pos.z);
-      DEBUG_PRINT("OA: sidestep X=%.2f, Y=%.2f m (front/back=%u mm)\n", (double)oaCtx.sidestepTarget.x, (double)oaCtx.sidestepTarget.y, dForward);
+      oaCtx.sidestepTarget = mkvec(pos.x + globalDx, pos.y + globalDy, pos.z);
+      DEBUG_PRINT("OA: sidestep X=%.2f, Y=%.2f m (body forward/back obstacle=%u mm)\n", 
+                  (double)oaCtx.sidestepTarget.x, (double)oaCtx.sidestepTarget.y, dForward);
     }
   } else {
-    const float dir = (oaCtx.goalPos.y - pos.y) >= 0.0f ? 1.0f : -1.0f; // +Y: left, -Y: right
-    const uint16_t dSide = dir > 0 ? oaReadRange(oaIdLeft) : oaReadRange(oaIdRight);
-    // DEBUG_PRINT("OA: dSide=%u mm\n", dSide);
+    // Moving primarily left/right in body frame
+    const float bodyDirSign = bodyDir.y >= 0.0f ? 1.0f : -1.0f; // +Y: left, -Y: right in body frame
+    const uint16_t dSide = bodyDirSign > 0 ? oaReadRange(oaIdLeft) : oaReadRange(oaIdRight);
+    
     if (dSide != UINT16_MAX && dSide > 0 && dSide < oaStop_mm) {
       // Choose forward/back sidestep toward side with more clearance
       const uint16_t dFront = oaReadRange(oaIdFront);
       const uint16_t dBack = oaReadRange(oaIdBack);
-      const float xSign = (dBack >= dFront) ? 1.0f : -1.0f; // +X forward, -X backward
+      const float bodyXSign = (dBack >= dFront) ? 1.0f : -1.0f; // +X forward, -X backward in body frame
 
-      const float dx = xSign * oaSidestep_m;
-      const struct vec relStep = mkvec(dx, 0.0f, 0.0f);
+      // Create sidestep in body frame
+      const float bodySidestepX = bodyXSign * oaSidestep_m;
+      const struct vec bodySidestep = mkvec(bodySidestepX, 0.0f, 0.0f);
+      
+      // Transform back to global frame
+      const float cosYaw = cosf(yaw);
+      const float sinYaw = sinf(yaw);
+      const float globalDx = cosYaw * bodySidestep.x;   // body X becomes global X component
+      const float globalDy = -sinYaw * bodySidestep.x;  // body X becomes global Y component
+      
+      const struct vec relStep = mkvec(globalDx, globalDy, 0.0f);
 
       xSemaphoreTake(lockTraj, portMAX_DELAY);
       float t = usecTimestamp() / 1e6f;
       const float speed = 0.3f; // m/s forward/back
-      const float duration = fmaxf(fabsf(dx) / speed, 0.8f);
-      (void)plan_go_to(&planner, /*relative*/true, /*linear*/true, relStep, yaw, duration, t);
+      const float stepDist = sqrtf(globalDx*globalDx + globalDy*globalDy);
+      const float duration = fmaxf(stepDist / speed, 0.8f);
+      
+      (void)plan_go_to(&planner, /*relative*/true, /*linear*/true, relStep, 0.0f, duration, t);
       xSemaphoreGive(lockTraj);
 
       oaCtx.mode = OA_SIDESTEP;
-      oaCtx.sidestepTarget = mkvec(pos.x + dx, pos.y, pos.z);
-      DEBUG_PRINT("OA: sidestep X=%.2f m (left/right=%u mm)\n", (double)dx, dSide);
+      oaCtx.sidestepTarget = mkvec(pos.x + globalDx, pos.y + globalDy, pos.z);
+      DEBUG_PRINT("OA: sidestep X=%.2f, Y=%.2f m (body left/right obstacle=%u mm)\n", 
+                  (double)globalDx, (double)globalDy, dSide);
     }
   }
 }

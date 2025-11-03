@@ -693,7 +693,7 @@ static uint32_t twrTagOnEvent(dwDevice_t *dev, uwbEvent_t event)
 
         // If we've had too many timeouts with current peer, try a different one
         if (consecutiveTimeouts >= MAX_CONSECUTIVE_TIMEOUTS) {
-          DEBUG_PRINT("TWR Tag ID %d: switching peer due to timeouts when sending to %d\n", selfID, current_receiveID);
+          // DEBUG_PRINT("TWR Tag ID %d: switching peer due to timeouts when sending to %d\n", selfID, current_receiveID);
           current_receiveID = selectNextPeer();
           consecutiveTimeouts = 0;
         }
