@@ -90,7 +90,7 @@ void kalmanCoreUpdateWithFlow(kalmanCoreData_t* this, const flowMeasurement_t *f
   }
 
 
-  if (isFlying && (this->S[KC_STATE_Z] > 0.07f)) {
+  if (isFlying && (this->S[KC_STATE_Z] > 0.12f)) {
     kalmanCoreScalarUpdate(this, &Hx, (measuredNX-predictedNX), flow->stdDevX*FLOW_RESOLUTION);
   }
 
@@ -108,7 +108,7 @@ void kalmanCoreUpdateWithFlow(kalmanCoreData_t* this, const flowMeasurement_t *f
     kalmanCoreScalarUpdate(this, &Hy, (0.0f-predictedNY), 0.0f);
   }
 
-  if (isFlying && (this->S[KC_STATE_Z] > 0.07f)) {
+  if (isFlying && (this->S[KC_STATE_Z] > 0.12f)) {
     kalmanCoreScalarUpdate(this, &Hy, (measuredNY-predictedNY), flow->stdDevY*FLOW_RESOLUTION);
   }
 }
