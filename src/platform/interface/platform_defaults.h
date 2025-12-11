@@ -222,23 +222,3 @@
 #ifndef AUTNAV_HOLD_HEIGHT_DEADZONE
     #define AUTNAV_HOLD_HEIGHT_DEADZONE 0.25f
 #endif
-
-// EKF defaults
-#ifndef EKF_DRAG_BX
-    #define EKF_DRAG_BX 4.2f
-#endif
-#ifndef EKF_DRAG_BY
-    #define EKF_DRAG_BY 1.8f
-#endif
-#ifndef EKF_DRAG_BZ
-    #define EKF_DRAG_BZ 0.9f
-#endif
-#ifndef EKF_DRAG_RX
-    #define EKF_DRAG_RX 0.0f
-#endif
-#ifndef EKF_DRAG_RY
-    #define EKF_DRAG_RY 0.0f
-#endif
-#ifndef EKF_DRAG_RZ
-    #define EKF_DRAG_RZ 0.11f
-#endif
