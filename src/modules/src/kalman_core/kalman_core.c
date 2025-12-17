@@ -73,8 +73,8 @@
 // The drag coefficients, used to model the drag on the flapper
 float dragBx = EKF_DRAG_BX; // drag on the X axis 
 float dragBy = EKF_DRAG_BY; // drag on the Y axis
-float dragBz = EKF_DRAG_BZ; // drag on the Y axis
-float drag_rx = EKF_DRAG_RX; // CoP distance to CoM in X NOTE: THIS IS NOT CONSTANT. THIS ACTUALLY DEPENDS ON DIHEDRAL ANGLE
+float dragBz = EKF_DRAG_BZ; // drag on the Z axis
+float drag_rx = EKF_DRAG_RX; // CoP distance to CoM in X axis
 float drag_ry = EKF_DRAG_RY; // CoP distance to CoM in Y axis
 float drag_rz = EKF_DRAG_RZ; // CoP distance to CoM in Z axis
 

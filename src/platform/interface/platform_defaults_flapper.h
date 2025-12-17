@@ -171,11 +171,11 @@
 #endif
 #ifndef EKF_DRAG_RZ
     #define EKF_DRAG_RZ 0.06f
-#endif
+#endif // NOTE: FOR X THIS IS NOT CONSTANT. THIS ACTUALLY DEPENDS ON DIHEDRAL ANGLE
 
 // flowdeck position offset
 #ifndef FLOWDECK_POS_X
-    #define FLOWDECK_POS_X 0.0f
+    #define FLOWDECK_POS_X 0.0f 
 #endif
 #ifndef FLOWDECK_POS_Y
     #define FLOWDECK_POS_Y 0.0f
