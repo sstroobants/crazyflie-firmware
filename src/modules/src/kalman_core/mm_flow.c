@@ -25,6 +25,7 @@
 
 #include "mm_flow.h"
 #include "log.h"
+#include "platform_defaults.h"
 
 #define FLOW_RESOLUTION 0.10f //We do get the measurements in 10x the motion pixels (experimentally measured)
 
@@ -35,9 +36,7 @@ static float measuredNX;
 static float measuredNY;
 
 // Define your optical flow sensor offset from IMU in body frame [m]
-static const Axis3f flow_pos_body = { .axis = { 0.0f, 0.0f, -0.12f } };
-static const Axis3f imu_pos_body = { .axis = { 0.0f, 0.0f, 0.0f } };
-
+static const Axis3f flow_pos_body = { .axis = { FLOWDECK_POS_X, FLOWDECK_POS_Y, FLOWDECK_POS_Z } };
 
 void kalmanCoreUpdateWithFlow(kalmanCoreData_t* this, const flowMeasurement_t *flow, const Axis3f *gyro)
 {

@@ -153,7 +153,7 @@
 
 #define YAW_MAX_DELTA 30.0
 
-// EKF defaults
+// EKF drag defaults
 #ifndef EKF_DRAG_BX
     #define EKF_DRAG_BX 4.2f
 #endif
@@ -172,3 +172,15 @@
 #ifndef EKF_DRAG_RZ
     #define EKF_DRAG_RZ 0.06f
 #endif
+
+// flowdeck position offset
+#ifndef FLOWDECK_POS_X
+    #define FLOWDECK_POS_X 0.0f
+#endif
+#ifndef FLOWDECK_POS_Y
+    #define FLOWDECK_POS_Y 0.0f
+#endif
+#ifndef FLOWDECK_POS_Z
+    #define FLOWDECK_POS_Z -0.12f
+#endif
+
