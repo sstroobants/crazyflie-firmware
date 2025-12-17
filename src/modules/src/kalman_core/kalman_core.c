@@ -423,17 +423,23 @@ static void predictDt(kalmanCoreData_t* this, const kalmanCoreParams_t *params, 
   A[KC_STATE_Z][KC_STATE_D2] = (this->S[KC_STATE_PX]*this->R[2][1] - this->S[KC_STATE_PY]*this->R[2][0])*dt;
 
   // body-frame velocity from body-frame velocity
-  A[KC_STATE_PX][KC_STATE_PX] = 1 - dt * dragBx; // drag not negligible
+  A[KC_STATE_PX][KC_STATE_PX] = 1; // drag negligible when not flying
   A[KC_STATE_PY][KC_STATE_PX] =-gyro->z*dt;
   A[KC_STATE_PZ][KC_STATE_PX] = gyro->y*dt;
-
+  
   A[KC_STATE_PX][KC_STATE_PY] = gyro->z*dt;
-  A[KC_STATE_PY][KC_STATE_PY] = 1 - dt * dragBy; // drag not negligible
+  A[KC_STATE_PY][KC_STATE_PY] = 1; // drag negligible when not flying
   A[KC_STATE_PZ][KC_STATE_PY] =-gyro->x*dt;
-
+  
   A[KC_STATE_PX][KC_STATE_PZ] =-gyro->y*dt;
   A[KC_STATE_PY][KC_STATE_PZ] = gyro->x*dt;
-  A[KC_STATE_PZ][KC_STATE_PZ] = 1 - dt * dragBz; //drag not negligible
+  A[KC_STATE_PZ][KC_STATE_PZ] = 1; // drag negligible when not flying
+
+  if (quadIsFlying) { // when flying, drag is not negligible
+    A[KC_STATE_PX][KC_STATE_PX] = 1 - dt * dragBx;
+    A[KC_STATE_PY][KC_STATE_PY] = 1 - dt * dragBy;
+    A[KC_STATE_PZ][KC_STATE_PZ] = 1 - dt * dragBz;
+  }
 
   // body-frame velocity from attitude error
   A[KC_STATE_PX][KC_STATE_D0] =  0;
@@ -844,6 +850,10 @@ PARAM_ADD(PARAM_FLOAT | PARAM_PERSISTENT, dragBx, &dragBx)
  * @brief drag in y direction
  */
 PARAM_ADD(PARAM_FLOAT | PARAM_PERSISTENT, dragBy, &dragBy)
+/**
+ * @brief drag in z direction
+ */
+PARAM_ADD(PARAM_FLOAT | PARAM_PERSISTENT, dragBz, &dragBz)
 /**
  * @brief aerodynamic force lever arm X (meters)
  */

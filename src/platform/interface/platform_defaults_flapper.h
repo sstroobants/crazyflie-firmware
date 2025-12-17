@@ -161,7 +161,7 @@
     #define EKF_DRAG_BY 1.8f
 #endif
 #ifndef EKF_DRAG_BZ
-    #define EKF_DRAG_BZ 0.9f
+    #define EKF_DRAG_BZ 0.3f
 #endif
 #ifndef EKF_DRAG_RX
     #define EKF_DRAG_RX 0.0f
